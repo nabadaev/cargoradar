@@ -100,7 +100,7 @@ export default function MapView({ onZoneClick }: Props) {
         type: 'circle',
         source: 'hot-zones',
         paint: {
-          'circle-radius': 40,
+          'circle-radius': 52,
           'circle-color': riskMatch(RISK_COLOR) as mapboxgl.Expression,
           'circle-opacity': 0.06,
           'circle-blur': 1,
@@ -113,7 +113,7 @@ export default function MapView({ onZoneClick }: Props) {
         type: 'circle',
         source: 'hot-zones',
         paint: {
-          'circle-radius': 26,
+          'circle-radius': 34,
           'circle-color': riskMatch(RISK_COLOR) as mapboxgl.Expression,
           'circle-opacity': 0.12,
           'circle-blur': 0.8,
@@ -126,7 +126,7 @@ export default function MapView({ onZoneClick }: Props) {
         type: 'circle',
         source: 'hot-zones',
         paint: {
-          'circle-radius': 14,
+          'circle-radius': 18,
           'circle-color': riskMatch(RISK_COLOR) as mapboxgl.Expression,
           'circle-opacity': 0.35,
           'circle-blur': 0.5,

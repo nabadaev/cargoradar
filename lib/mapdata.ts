@@ -84,7 +84,7 @@ export const TRADE_LANES: TradeLane[] = [
     id: 'transatlantic',
     name: 'North America East Coast → Europe',
     riskLevel: 'low',
-    waypoints: [[-74.0,40.7],[-50.0,45.0],[-30.0,48.0],[-10.0,50.0],[4.1,51.9]],
+    waypoints: [[-74.0,40.7],[-60.0,43.0],[-45.0,47.0],[-30.0,50.0],[-15.0,51.0],[-5.0,51.5],[4.1,51.9]],
   },
   {
     id: 'middle-east-europe',
