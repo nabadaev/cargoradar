@@ -1,6 +1,6 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+const getResend = () => new Resend(process.env.RESEND_API_KEY)
 
 export async function sendAlertEmail({
   to,
@@ -15,7 +15,7 @@ export async function sendAlertEmail({
   summary: string
   severity: number
 }) {
-  return resend.emails.send({
+  return getResend().emails.send({
     from: 'CargoRadar <alerts@cargoradar.io>',
     to,
     subject: `[ALERT] ${zoneName} — Severity ${severity}/10`,
@@ -24,7 +24,7 @@ export async function sendAlertEmail({
 }
 
 export async function sendWaitlistConfirmation({ to }: { to: string }) {
-  return resend.emails.send({
+  return getResend().emails.send({
     from: 'CargoRadar <hello@cargoradar.io>',
     to,
     subject: "You're on the CargoRadar waitlist",

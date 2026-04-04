@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const getClient = () => new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 export interface NewsAnalysis {
   summary: string
@@ -10,7 +10,7 @@ export interface NewsAnalysis {
 }
 
 export async function analyzeNewsItem(rawContent: string, zoneName: string): Promise<NewsAnalysis> {
-  const message = await client.messages.create({
+  const message = await getClient().messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 1024,
     messages: [
