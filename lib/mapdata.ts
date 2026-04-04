@@ -4,6 +4,7 @@ export interface HotZone {
   coordinates: [number, number] // [lng, lat]
   riskLevel: 'low' | 'medium' | 'high' | 'critical'
   riskScore: number
+  description: string
 }
 
 export interface TradeLane {
@@ -14,23 +15,63 @@ export interface TradeLane {
 }
 
 export const HOT_ZONES: HotZone[] = [
-  { id: 'hormuz',        name: 'Strait of Hormuz',         coordinates: [56.3,  26.6], riskLevel: 'critical', riskScore: 9.8 },
-  { id: 'red-sea',       name: 'Red Sea / Bab-el-Mandeb', coordinates: [43.3,  12.5],  riskLevel: 'critical', riskScore: 8.4 },
-  { id: 'black-sea',     name: 'Black Sea',                coordinates: [34.0,  43.0], riskLevel: 'high',     riskScore: 7.2 },
-  { id: 'suez',          name: 'Suez Canal',               coordinates: [32.3,  30.5], riskLevel: 'high',     riskScore: 7.0 },
-  { id: 'taiwan-strait', name: 'Taiwan Strait',            coordinates: [119.5, 24.5], riskLevel: 'high',     riskScore: 6.5 },
-  { id: 'panama',        name: 'Panama Canal',             coordinates: [-79.7,  9.1], riskLevel: 'medium',   riskScore: 5.4 },
-  { id: 'shanghai',      name: 'Port of Shanghai',         coordinates: [121.5, 31.2], riskLevel: 'medium',   riskScore: 4.2 },
-  { id: 'la-lb',         name: 'Port of LA / Long Beach',  coordinates: [-118.2, 33.7], riskLevel: 'medium',  riskScore: 3.8 },
-  { id: 'malacca',       name: 'Strait of Malacca',        coordinates: [101.2,  2.5], riskLevel: 'low',      riskScore: 3.2 },
-  { id: 'rotterdam',     name: 'Port of Rotterdam',        coordinates: [4.1,   51.9], riskLevel: 'low',      riskScore: 2.8 },
+  {
+    id: 'hormuz', name: 'Strait of Hormuz', coordinates: [56.3, 26.6],
+    riskLevel: 'critical', riskScore: 9.8,
+    description: 'Effectively closed to commercial traffic. 21 confirmed ship attacks since Jan 2026. All major carriers have suspended transits. War-risk insurance withdrawn by Lloyd\'s and most underwriters.',
+  },
+  {
+    id: 'red-sea', name: 'Red Sea / Bab-el-Mandeb', coordinates: [43.3, 12.5],
+    riskLevel: 'critical', riskScore: 8.4,
+    description: 'Houthi drone and missile strikes ongoing. Now secondary crisis vs Hormuz but still active threat. Most carriers avoiding entirely, routing via Cape of Good Hope.',
+  },
+  {
+    id: 'black-sea', name: 'Black Sea', coordinates: [34.0, 43.0],
+    riskLevel: 'high', riskScore: 7.2,
+    description: 'Ongoing Russia-Ukraine conflict continues to disrupt grain and commodity shipments. Ukrainian ports partially operational under grain corridor agreements.',
+  },
+  {
+    id: 'suez', name: 'Suez Canal', coordinates: [32.3, 30.5],
+    riskLevel: 'high', riskScore: 7.0,
+    description: 'Closed to most container traffic due to compound Red Sea and Hormuz crisis. Vessels from Asia rerouting via Cape of Good Hope adding 14–18 days transit time.',
+  },
+  {
+    id: 'taiwan-strait', name: 'Taiwan Strait', coordinates: [119.5, 24.5],
+    riskLevel: 'high', riskScore: 6.5,
+    description: 'Elevated PLA military exercises and naval activity. Commercial transits still proceeding but insurers tracking closely. Situation could escalate with little warning.',
+  },
+  {
+    id: 'panama', name: 'Panama Canal', coordinates: [-79.7, 9.1],
+    riskLevel: 'medium', riskScore: 5.4,
+    description: 'Water levels recovering after 2024–25 drought restrictions. Daily transits back to ~32 vessels but still below normal capacity of 38. Booking queues manageable.',
+  },
+  {
+    id: 'shanghai', name: 'Port of Shanghai', coordinates: [121.5, 31.2],
+    riskLevel: 'medium', riskScore: 4.2,
+    description: 'Increased congestion from Hormuz and Red Sea rerouting pushing demand through Asian ports. Average dwell times up 1.8 days vs Q4 2025. Yard utilisation at 87%.',
+  },
+  {
+    id: 'la-lb', name: 'Port of LA / Long Beach', coordinates: [-118.2, 33.7],
+    riskLevel: 'medium', riskScore: 3.8,
+    description: 'Increased inbound volumes from Cape of Good Hope rerouting. Longer transit times reducing vessel frequency but port operations stable. Labour contract renewed through 2027.',
+  },
+  {
+    id: 'malacca', name: 'Strait of Malacca', coordinates: [101.2, 2.5],
+    riskLevel: 'low', riskScore: 3.2,
+    description: 'Traffic volumes elevated as vessels avoid Red Sea and Hormuz. Monitoring for piracy and congestion risk. Singapore and Malaysian coast guard presence increased.',
+  },
+  {
+    id: 'rotterdam', name: 'Port of Rotterdam', coordinates: [4.1, 51.9],
+    riskLevel: 'low', riskScore: 2.8,
+    description: 'Supply chain pressure from global rerouting but port operations fully functional. Receiving diverted cargo flows. Throughput up 12% YoY as Cape route traffic increases.',
+  },
 ]
 
 export const TRADE_LANES: TradeLane[] = [
   {
     id: 'far-east-north-europe',
     name: 'Far East → North Europe',
-    riskLevel: 'high',
+    riskLevel: 'critical',
     waypoints: [[121.5, 31.2], [101.2, 2.5], [43.3, 12.5], [32.3, 30.5], [4.1, 51.9]],
   },
   {
@@ -48,13 +89,13 @@ export const TRADE_LANES: TradeLane[] = [
   {
     id: 'middle-east-europe',
     name: 'Middle East → Europe',
-    riskLevel: 'high',
+    riskLevel: 'critical',
     waypoints: [[56.3, 26.6], [43.3, 12.5], [32.3, 30.5], [4.1, 51.9]],
   },
   {
     id: 'middle-east-asia',
     name: 'Middle East → Asia',
-    riskLevel: 'high',
+    riskLevel: 'critical',
     waypoints: [[56.3, 26.6], [101.2, 2.5], [121.5, 31.2]],
   },
   {
