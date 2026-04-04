@@ -17,3 +17,4 @@ dist/
 # debug
 npm-debug.log*
 .claude/
+.vercel

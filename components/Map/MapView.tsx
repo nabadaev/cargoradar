@@ -6,19 +6,12 @@ import 'mapbox-gl/dist/mapbox-gl.css'
 import { HOT_ZONES, TRADE_LANES } from '@/lib/mapdata'
 import type { HotZone } from '@/lib/mapdata'
 
-// DESIGN.md risk colors
-const STROKE: Record<string, string> = {
-  critical: '#c0392b',
-  high:     '#b8680a',
-  medium:   '#b8680a',
-  low:      '#1a6b3a',
-}
-
-const FILL: Record<string, string> = {
-  critical: 'rgba(192,57,43,0.08)',
-  high:     'rgba(184,104,10,0.08)',
-  medium:   'rgba(184,104,10,0.08)',
-  low:      'rgba(26,107,58,0.08)',
+// Risk colors per spec
+const RISK_COLOR: Record<string, string> = {
+  critical: '#D4291A',
+  high:     '#C97A1A',
+  medium:   '#B5901A',
+  low:      '#2E7D45',
 }
 
 const riskMatch = (colors: Record<string, string>) => [
@@ -29,6 +22,7 @@ const riskMatch = (colors: Record<string, string>) => [
   'low',      colors.low,
   '#6e6e6e',
 ]
+
 
 interface Props {
   onZoneClick: (zone: HotZone) => void
@@ -83,7 +77,7 @@ export default function MapView({ onZoneClick }: Props) {
           'line-width': 1.5,
           'line-dasharray': [3, 2],
           'line-opacity': 0.55,
-          'line-color': riskMatch(STROKE) as mapboxgl.Expression,
+          'line-color': riskMatch(RISK_COLOR) as mapboxgl.Expression,
         },
       })
 
@@ -100,19 +94,46 @@ export default function MapView({ onZoneClick }: Props) {
         },
       })
 
+      // Layer 1 — outer mist (large, very low opacity)
       map.addLayer({
-        id: 'hot-zones-fill',
+        id: 'hot-zones-mist-outer',
         type: 'circle',
         source: 'hot-zones',
         paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 14, 3, 26, 5, 48, 8, 90] as mapboxgl.Expression,
-          'circle-color': riskMatch(FILL) as mapboxgl.Expression,
-          'circle-stroke-width': 1.5,
-          'circle-stroke-color': riskMatch(STROKE) as mapboxgl.Expression,
+          'circle-radius': 40,
+          'circle-color': riskMatch(RISK_COLOR) as mapboxgl.Expression,
+          'circle-opacity': 0.06,
+          'circle-blur': 1,
         },
       })
 
-      // Risk score label
+      // Layer 2 — mid glow
+      map.addLayer({
+        id: 'hot-zones-mist-mid',
+        type: 'circle',
+        source: 'hot-zones',
+        paint: {
+          'circle-radius': 26,
+          'circle-color': riskMatch(RISK_COLOR) as mapboxgl.Expression,
+          'circle-opacity': 0.12,
+          'circle-blur': 0.8,
+        },
+      })
+
+      // Layer 3 — core (small, most visible but still soft)
+      map.addLayer({
+        id: 'hot-zones-mist-core',
+        type: 'circle',
+        source: 'hot-zones',
+        paint: {
+          'circle-radius': 14,
+          'circle-color': riskMatch(RISK_COLOR) as mapboxgl.Expression,
+          'circle-opacity': 0.35,
+          'circle-blur': 0.5,
+        },
+      })
+
+      // Risk score label — sits above all mist layers
       map.addLayer({
         id: 'hot-zones-scores',
         type: 'symbol',
@@ -125,22 +146,24 @@ export default function MapView({ onZoneClick }: Props) {
           'text-ignore-placement': true,
         },
         paint: {
-          'text-color': riskMatch(STROKE) as mapboxgl.Expression,
+          'text-color': riskMatch(RISK_COLOR) as mapboxgl.Expression,
           'text-halo-color': '#ffffff',
           'text-halo-width': 1.5,
         },
       })
 
       // ── Interaction ─────────────────────────────────────────────
-      map.on('click', 'hot-zones-fill', e => {
-        const props = e.features?.[0]?.properties
-        if (!props) return
-        const zone = HOT_ZONES.find(z => z.id === props.id)
-        if (zone) callbackRef.current(zone)
-      })
-
-      map.on('mouseenter', 'hot-zones-fill', () => { map.getCanvas().style.cursor = 'pointer' })
-      map.on('mouseleave', 'hot-zones-fill', () => { map.getCanvas().style.cursor = '' })
+      // Click on any mist layer
+      for (const layerId of ['hot-zones-mist-outer', 'hot-zones-mist-mid', 'hot-zones-mist-core']) {
+        map.on('click', layerId, e => {
+          const props = e.features?.[0]?.properties
+          if (!props) return
+          const zone = HOT_ZONES.find(z => z.id === props.id)
+          if (zone) callbackRef.current(zone)
+        })
+        map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer' })
+        map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = '' })
+      }
     })
 
     return () => { map.remove(); mapRef.current = null }
