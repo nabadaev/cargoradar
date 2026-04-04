@@ -4,7 +4,7 @@ import { useState } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import ZonePanel from '@/components/ZonePanel'
-import type { HotZone } from '@/lib/mapdata'
+import type { Zone } from '@/lib/mapdata'
 
 // Mapbox requires client-only rendering — no SSR
 const MapView = dynamic(() => import('@/components/Map/MapView'), { ssr: false })
@@ -78,7 +78,7 @@ function MapNav({ search, onSearch }: { search: string; onSearch: (v: string) =>
 }
 
 export default function MapPage() {
-  const [selectedZone, setSelectedZone] = useState<HotZone | null>(null)
+  const [selectedZone, setSelectedZone] = useState<Zone | null>(null)
   const [search, setSearch] = useState('')
 
   return (

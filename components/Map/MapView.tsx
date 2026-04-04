@@ -3,8 +3,8 @@
 import { useEffect, useRef } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
-import { HOT_ZONES, TRADE_LANES } from '@/lib/mapdata'
-import type { HotZone } from '@/lib/mapdata'
+import { ZONES, TRADE_LANES } from '@/lib/mapdata'
+import type { Zone } from '@/lib/mapdata'
 
 // Risk colors per spec
 const RISK_COLOR: Record<string, string> = {
@@ -25,7 +25,7 @@ const riskMatch = (colors: Record<string, string>) => [
 
 
 interface Props {
-  onZoneClick: (zone: HotZone) => void
+  onZoneClick: (zone: Zone) => void
 }
 
 export default function MapView({ onZoneClick }: Props) {
@@ -63,7 +63,7 @@ export default function MapView({ onZoneClick }: Props) {
           features: TRADE_LANES.map(lane => ({
             type: 'Feature' as const,
             properties: { id: lane.id, riskLevel: lane.riskLevel },
-            geometry: { type: 'LineString' as const, coordinates: lane.waypoints },
+            geometry: { type: 'LineString' as const, coordinates: lane.coordinates },
           })),
         },
       })
@@ -86,7 +86,7 @@ export default function MapView({ onZoneClick }: Props) {
         type: 'geojson',
         data: {
           type: 'FeatureCollection',
-          features: HOT_ZONES.map(z => ({
+          features: ZONES.map(z => ({
             type: 'Feature' as const,
             properties: { id: z.id, name: z.name, riskLevel: z.riskLevel, riskScore: z.riskScore },
             geometry: { type: 'Point' as const, coordinates: z.coordinates },
@@ -158,7 +158,7 @@ export default function MapView({ onZoneClick }: Props) {
         map.on('click', layerId, e => {
           const props = e.features?.[0]?.properties
           if (!props) return
-          const zone = HOT_ZONES.find(z => z.id === props.id)
+          const zone = ZONES.find(z => z.id === props.id)
           if (zone) callbackRef.current(zone)
         })
         map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer' })

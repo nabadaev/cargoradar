@@ -1,5 +1,5 @@
 import RiskScore from '@/components/RiskScore'
-import type { HotZone } from '@/lib/mapdata'
+import type { Zone } from '@/lib/mapdata'
 
 interface NewsItem {
   date: string
@@ -21,7 +21,7 @@ function severityColor(s: number) {
 }
 
 interface Props {
-  zone: HotZone | null
+  zone: Zone | null
   onClose: () => void
 }
 
