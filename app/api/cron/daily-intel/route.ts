@@ -3,6 +3,8 @@ import { createServiceClient } from '@/lib/supabase'
 import { fetchMaritimeNews } from '@/lib/rss'
 import { analyseNewsItem } from '@/lib/claude'
 import { computeCMRS } from '@/lib/scoring'
+import { sendAlertEmail } from '@/lib/resend'
+import type { AlertNewsItem } from '@/lib/resend'
 import type { RiskLevel } from '@/lib/mapdata'
 
 function riskLevelFromScore(score: number): RiskLevel {
@@ -39,7 +41,13 @@ export async function GET(request: Request) {
 
     for (const zone of zones) {
       try {
+        // Save previous risk level for change detection
+        const previousRiskLevel = zone.risk_level as string
+
         const rssItems = await fetchMaritimeNews(zone.name)
+
+        // Track the most recently inserted news item for this zone
+        let latestNewItem: AlertNewsItem | null = null
 
         for (const item of rssItems) {
           try {
@@ -91,6 +99,14 @@ export async function GET(request: Request) {
               errors.push(`Zone ${zone.name} — insert error: ${insertError.message}`)
             } else {
               newItemsAdded++
+              // Track the first new item per zone as the latest
+              if (!latestNewItem) {
+                latestNewItem = {
+                  ai_summary: analysis.summary,
+                  impact_lane: analysis.impact_lane,
+                  cmrs_score: cmrsResult.score,
+                }
+              }
             }
           } catch (itemErr) {
             errors.push(
@@ -107,6 +123,9 @@ export async function GET(request: Request) {
           .eq('zone_id', zone.id)
           .gte('created_at', thirtyDaysAgo)
 
+        let clampedScore = zone.risk_score ?? 5
+        let newRiskLevel: RiskLevel = riskLevelFromScore(clampedScore)
+
         if (recentNewsItems && recentNewsItems.length > 0) {
           const now = Date.now()
           const decayedScores = recentNewsItems
@@ -120,8 +139,8 @@ export async function GET(request: Request) {
           if (decayedScores.length > 0) {
             const weightedScore =
               decayedScores.reduce((sum, s) => sum + s, 0) / decayedScores.length
-            const clampedScore = Math.max(1, Math.min(10, Math.round(weightedScore * 10) / 10))
-            const newRiskLevel = riskLevelFromScore(clampedScore)
+            clampedScore = Math.max(1, Math.min(10, Math.round(weightedScore * 10) / 10))
+            newRiskLevel = riskLevelFromScore(clampedScore)
 
             await supabase
               .from('zones')
@@ -131,6 +150,49 @@ export async function GET(request: Request) {
                 updated_at: new Date().toISOString(),
               })
               .eq('id', zone.id)
+
+            // Insert score history row
+            await supabase.from('zone_score_history').insert({
+              zone_id: zone.id,
+              risk_score: clampedScore,
+              recorded_at: new Date().toISOString(),
+            })
+
+            // Send alerts if risk level escalated to high or critical
+            if (
+              newRiskLevel !== previousRiskLevel &&
+              (newRiskLevel === 'high' || newRiskLevel === 'critical') &&
+              latestNewItem
+            ) {
+              try {
+                const { data: subscribers } = await supabase
+                  .from('zone_alerts')
+                  .select('email')
+                  .eq('zone_name', zone.name)
+
+                if (subscribers && subscribers.length > 0) {
+                  for (const sub of subscribers) {
+                    try {
+                      await sendAlertEmail({
+                        to: sub.email,
+                        zoneName: zone.name,
+                        riskLevel: newRiskLevel,
+                        cmrsScore: clampedScore,
+                        newsItem: latestNewItem,
+                      })
+                    } catch (emailErr) {
+                      errors.push(
+                        `Alert email to ${sub.email} for ${zone.name} — ${emailErr instanceof Error ? emailErr.message : String(emailErr)}`,
+                      )
+                    }
+                  }
+                }
+              } catch (alertErr) {
+                errors.push(
+                  `Zone ${zone.name} alert query — ${alertErr instanceof Error ? alertErr.message : String(alertErr)}`,
+                )
+              }
+            }
           }
         }
 

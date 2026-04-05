@@ -1,11 +1,20 @@
 import RiskScore from '@/components/RiskScore'
 import WaitlistForm from '@/components/WaitlistForm'
+import LiveRiskWidget from '@/components/LiveRiskWidget'
 import { HOT_ZONES } from '@/lib/mapdata'
+import { createServiceClient } from '@/lib/supabase'
+import type { Zone } from '@/lib/mapdata'
 
 // ─── Ticker ──────────────────────────────────────────────────────────────────
 
-function Ticker() {
-  const items = HOT_ZONES.map(z => ({
+interface TickerZone {
+  name: string
+  riskScore: number
+  riskLevel: string
+}
+
+function Ticker({ zones }: { zones: TickerZone[] }) {
+  const items = zones.map(z => ({
     name: z.name.toUpperCase(),
     score: z.riskScore,
     level: z.riskLevel,
@@ -142,12 +151,83 @@ function SectionLabel({ label }: { label: string }) {
   )
 }
 
+// ─── How It Works ─────────────────────────────────────────────────────────────
+
+function HowItWorks() {
+  const steps = [
+    {
+      num: '01',
+      title: 'DAILY INTELLIGENCE',
+      body: 'RSS feeds from 8 maritime sources analysed by AI every evening. New incidents scored and categorised automatically.',
+    },
+    {
+      num: '02',
+      title: 'CMRS SCORING',
+      body: "The CargoRadar Maritime Risk Score applies Caldara & Iacoviello's GPR methodology — the same framework used by the Federal Reserve — adapted for ocean freight.",
+    },
+    {
+      num: '03',
+      title: 'INSTANT ALERTS',
+      body: 'Subscribe to any hot zone. Get emailed the moment risk escalates — with AI-generated impact analysis specific to your trade lane.',
+    },
+  ]
+
+  return (
+    <section style={{ padding: '80px 48px', maxWidth: '1100px', margin: '0 auto' }}>
+      <SectionLabel label="HOW IT WORKS" />
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        borderTop: '1px solid var(--rule)',
+        borderLeft: '1px solid var(--rule)',
+      }}>
+        {steps.map(s => (
+          <div key={s.num} style={{
+            borderRight: '1px solid var(--rule)',
+            borderBottom: '1px solid var(--rule)',
+            padding: '36px 32px',
+          }}>
+            <div style={{
+              fontFamily: 'var(--mono)',
+              fontSize: '10px',
+              color: 'var(--muted)',
+              letterSpacing: '0.14em',
+              marginBottom: '8px',
+            }}>
+              {s.num}
+            </div>
+            <div style={{
+              fontFamily: 'var(--mono)',
+              fontSize: '13px',
+              fontWeight: 600,
+              color: 'var(--ink)',
+              marginTop: '8px',
+              marginBottom: '8px',
+            }}>
+              {s.title}
+            </div>
+            <div style={{
+              fontFamily: 'var(--body)',
+              fontSize: '13px',
+              color: 'var(--muted)',
+              lineHeight: 1.65,
+              marginTop: '8px',
+            }}>
+              {s.body}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 // ─── Features grid ───────────────────────────────────────────────────────────
 
 const FEATURES = [
-  { label: '01', title: 'Live Risk Scores', body: 'Every critical choke point scored 1–10, updated daily from verified sources.' },
-  { label: '02', title: 'AI Impact Analysis', body: 'Claude reads the noise so you don\'t have to. Plain-language impact for every alert.' },
-  { label: '03', title: 'Trade Lane Tracking', body: 'Far East to Europe, Transpacific, Transatlantic — monitor the routes you actually use.' },
+  { label: '01', title: 'Live Risk Scores', body: 'Every critical choke point on the Far East → Europe route scored 1–10, updated daily from verified sources.' },
+  { label: '02', title: 'AI Impact Analysis', body: 'Claude reads the noise so you don\'t have to. Plain-language impact for every alert on your lane.' },
+  { label: '03', title: 'Trade Lane Tracking', body: 'Far East → Europe via Cape of Good Hope — monitor the chokepoints that affect your cargo directly.' },
   { label: '04', title: 'Instant Alerts', body: 'Email notification the moment severity spikes on any zone you follow.' },
   { label: '05', title: 'Weekly Digest', body: 'A clean summary every Monday of what moved, what changed, and what to watch.' },
   { label: '06', title: 'Interactive Map', body: 'Mapbox-powered world map. Click any hot zone to pull the full intelligence brief.' },
@@ -202,7 +282,7 @@ function FeaturesGrid() {
 
 // ─── Zones table ─────────────────────────────────────────────────────────────
 
-function ZonesTable() {
+function ZonesTable({ zones }: { zones: Zone[] }) {
   return (
     <table style={{
       width: '100%',
@@ -231,7 +311,7 @@ function ZonesTable() {
         </tr>
       </thead>
       <tbody>
-        {HOT_ZONES.map((zone, i) => {
+        {zones.map((zone, i) => {
           const region = zoneRegion(zone.id)
           return (
             <tr key={zone.id} style={{ background: i % 2 === 0 ? 'var(--white)' : 'transparent' }}>
@@ -314,9 +394,7 @@ function Hero() {
             marginBottom: '40px',
             maxWidth: '420px',
           }}>
-            CargoRadar monitors 10 critical ocean freight choke points in real time —
-            Red Sea, Suez, Hormuz, Panama and more — and alerts you the moment
-            risk escalates on your lanes.
+            CargoRadar monitors the Far East → Europe trade lane in real time — tracking the Red Sea crisis, Cape of Good Hope diversion, Strait of Hormuz tensions, and every chokepoint in between. Know before it hits your shipment.
           </p>
 
           <WaitlistForm />
@@ -332,62 +410,9 @@ function Hero() {
           </p>
         </div>
 
-        {/* Right — live risk panel */}
-        <div className="fade-up fade-up-2" style={{ border: '1px solid var(--rule)' }}>
-          <div style={{
-            padding: '14px 20px',
-            borderBottom: '1px solid var(--rule)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
-            <span style={{
-              fontFamily: 'var(--mono)',
-              fontSize: '10px',
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              color: 'var(--muted)',
-            }}>
-              LIVE RISK OVERVIEW
-            </span>
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontFamily: 'var(--mono)',
-              fontSize: '10px',
-              color: 'var(--muted)',
-            }}>
-              <span style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: '#4caa72',
-                display: 'inline-block',
-              }} />
-              LIVE
-            </span>
-          </div>
-
-          {HOT_ZONES.map((zone, i) => (
-            <div key={zone.id} style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '11px 20px',
-              borderBottom: i < HOT_ZONES.length - 1 ? '1px solid var(--rule)' : undefined,
-            }}>
-              <span style={{
-                fontFamily: 'var(--mono)',
-                fontSize: '11px',
-                color: 'var(--ink)',
-                fontWeight: 500,
-              }}>
-                {zone.name}
-              </span>
-              <RiskScore level={zone.riskLevel} score={zone.riskScore} />
-            </div>
-          ))}
+        {/* Right — live risk panel (client component) */}
+        <div className="fade-up fade-up-2">
+          <LiveRiskWidget />
         </div>
       </div>
     </section>
@@ -396,15 +421,33 @@ function Hero() {
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
-export default function HomePage() {
+export default async function HomePage() {
+  // Fetch live zone data server-side for ticker and zones table
+  let liveZones: Zone[] = HOT_ZONES
+  try {
+    const supabase = createServiceClient()
+    const { data } = await supabase.from('zones').select('name, risk_score, risk_level')
+    if (data && data.length > 0) {
+      liveZones = HOT_ZONES.map(z => {
+        const live = data.find((d: { name: string; risk_score: number; risk_level: string }) => d.name === z.name)
+        return live ? { ...z, riskScore: live.risk_score, riskLevel: live.risk_level as Zone['riskLevel'] } : z
+      })
+    }
+  } catch {
+    // fall back to static data
+  }
+
   return (
     <>
-      <Ticker />
+      <Ticker zones={liveZones} />
       <Nav />
 
       <div style={{ paddingTop: '88px' /* ticker 32px + nav 56px */ }}>
 
         <Hero />
+
+        {/* How It Works section */}
+        <HowItWorks />
 
         {/* Features section */}
         <section style={{ padding: '100px 48px', maxWidth: '1100px', margin: '0 auto' }}>
@@ -415,7 +458,7 @@ export default function HomePage() {
         {/* Zones section */}
         <section style={{ padding: '0 48px 100px', maxWidth: '1100px', margin: '0 auto' }}>
           <SectionLabel label="MONITORED HOT ZONES" />
-          <ZonesTable />
+          <ZonesTable zones={liveZones} />
         </section>
 
         {/* Bottom CTA */}

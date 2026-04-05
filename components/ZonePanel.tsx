@@ -80,12 +80,42 @@ function ImpactBlock({ label, text }: { label: string; text: string | null }) {
   )
 }
 
+function Sparkline({ data, color }: { data: number[]; color: string }) {
+  if (data.length < 2) return null
+  const w = 332, h = 32, pad = 2
+  const min = Math.min(...data), max = Math.max(...data)
+  const range = max - min || 1
+  const pts = data.map((v, i) => {
+    const x = pad + (i / (data.length - 1)) * (w - pad * 2)
+    const y = pad + ((max - v) / range) * (h - pad * 2)
+    return `${x},${y}`
+  }).join(' ')
+  return (
+    <div style={{ marginTop: '12px' }}>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: '9px', letterSpacing: '0.14em', color: 'var(--muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
+        30-DAY TREND
+      </div>
+      <svg width={w} height={h} style={{ display: 'block', width: '100%' }} viewBox={`0 0 ${w} ${h}`}>
+        <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+      </svg>
+    </div>
+  )
+}
+
 export default function ZonePanel({ zone, onClose }: Props) {
-  const [zoneData, setZoneData]     = useState<ZoneData | null>(null)
-  const [newsItems, setNewsItems]   = useState<NewsItem[]>([])
-  const [totalCount, setTotalCount] = useState(0)
-  const [loading, setLoading]       = useState(false)
-  const [openIndex, setOpenIndex]   = useState<number | null>(null)
+  const [zoneData, setZoneData]           = useState<ZoneData | null>(null)
+  const [newsItems, setNewsItems]         = useState<NewsItem[]>([])
+  const [totalCount, setTotalCount]       = useState(0)
+  const [loading, setLoading]             = useState(false)
+  const [openIndex, setOpenIndex]         = useState<number | null>(null)
+  const [situation, setSituation]         = useState<string | null>(null)
+  const [situationLoading, setSituationLoading] = useState(false)
+  const [scoreHistory, setScoreHistory]   = useState<{ risk_score: number; recorded_at: string }[]>([])
+
+  // Alert signup state
+  const [alertEmail, setAlertEmail]       = useState('')
+  const [alertStatus, setAlertStatus]     = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [alertError, setAlertError]       = useState('')
 
   useEffect(() => {
     if (!zone) return
@@ -94,6 +124,10 @@ export default function ZonePanel({ zone, onClose }: Props) {
     setTotalCount(0)
     setLoading(true)
     setOpenIndex(null)
+    setSituation(null)
+    setScoreHistory([])
+    setAlertStatus('idle')
+    setAlertError('')
 
     const supabase = getSupabaseClient()
 
@@ -107,6 +141,15 @@ export default function ZonePanel({ zone, onClose }: Props) {
       if (zRow) {
         setZoneData(zRow)
 
+        // Fetch score history
+        const { data: history } = await supabase
+          .from('zone_score_history')
+          .select('risk_score, recorded_at')
+          .eq('zone_id', zRow.id)
+          .order('recorded_at', { ascending: true })
+          .limit(30)
+        setScoreHistory(history ?? [])
+
         // Fetch top 5 + count
         const { data: news, count } = await supabase
           .from('news_items')
@@ -117,6 +160,27 @@ export default function ZonePanel({ zone, onClose }: Props) {
 
         setNewsItems(news ?? [])
         setTotalCount(count ?? 0)
+
+        // Fetch live situation summary if we have news
+        if (news && news.length > 0) {
+          setSituationLoading(true)
+          fetch('/api/zones/situation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              zone_name: zone!.name,
+              news_items: news.slice(0, 3).map(n => ({
+                ai_summary: n.ai_summary,
+                impact_lane: n.impact_lane,
+                created_at: n.created_at,
+              })),
+            }),
+          })
+            .then(r => r.json())
+            .then(d => { if (d.situation) setSituation(d.situation) })
+            .catch(() => {})
+            .finally(() => setSituationLoading(false))
+        }
       }
 
       setLoading(false)
@@ -130,8 +194,37 @@ export default function ZonePanel({ zone, onClose }: Props) {
   const description = zoneData?.description ?? zone?.description ?? ''
   const updatedAt   = zoneData?.updated_at ? formatDate(zoneData.updated_at) : '—'
 
+  const sparklineColor =
+    riskLevel === 'critical' ? '#c0392b' :
+    riskLevel === 'high'     ? '#b8680a' :
+    riskLevel === 'medium'   ? '#b8680a' :
+    '#1a6b3a'
+
   function toggleItem(i: number) {
     setOpenIndex(prev => (prev === i ? null : i))
+  }
+
+  async function handleAlertSubscribe() {
+    if (!zone) return
+    setAlertStatus('loading')
+    setAlertError('')
+    try {
+      const res = await fetch('/api/alerts/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: alertEmail, zone_name: zone.name }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setAlertError(data.error ?? 'Subscription failed')
+        setAlertStatus('error')
+      } else {
+        setAlertStatus('success')
+      }
+    } catch {
+      setAlertError('Network error — please try again')
+      setAlertStatus('error')
+    }
   }
 
   return (
@@ -173,6 +266,12 @@ export default function ZonePanel({ zone, onClose }: Props) {
                 Updated {updatedAt}
               </span>
             </div>
+            {scoreHistory.length >= 2 && (
+              <Sparkline
+                data={scoreHistory.map(h => h.risk_score)}
+                color={sparklineColor}
+              />
+            )}
           </div>
 
           {/* ── Situation ── */}
@@ -185,6 +284,14 @@ export default function ZonePanel({ zone, onClose }: Props) {
             </div>
             {loading ? (
               <div style={{ ...mono, fontSize: '11px', color: 'var(--muted)' }}>Loading...</div>
+            ) : situationLoading ? (
+              <p style={{ ...body, fontSize: '13px', color: 'var(--muted)', lineHeight: 1.65, margin: 0, fontStyle: 'italic' }}>
+                Generating situation summary...
+              </p>
+            ) : situation ? (
+              <p style={{ ...body, fontSize: '13px', color: 'var(--ink)', lineHeight: 1.65, margin: 0 }}>
+                {situation}
+              </p>
             ) : (
               <p style={{ ...body, fontSize: '13px', color: 'var(--ink)', lineHeight: 1.65, margin: 0 }}>
                 {description}
@@ -310,19 +417,71 @@ export default function ZonePanel({ zone, onClose }: Props) {
             )}
           </div>
 
-          {/* ── CTA ── */}
+          {/* ── Alert Signup CTA ── */}
           <div style={{ padding: '20px 24px', marginTop: 'auto', borderTop: '1px solid var(--rule)', flexShrink: 0 }}>
-            <p style={{ ...mono, fontSize: '10px', color: 'var(--muted)', letterSpacing: '0.06em', marginBottom: '10px' }}>
-              GET ALERTS FOR THIS ZONE
-            </p>
-            <a href="/" style={{
-              display: 'block', textAlign: 'center',
-              ...mono, fontSize: '11px', fontWeight: 600, letterSpacing: '0.12em',
-              color: '#fff', background: 'var(--ink)', padding: '11px',
-              textDecoration: 'none', textTransform: 'uppercase',
-            }}>
-              JOIN WAITLIST
-            </a>
+            {/* Section header with rule */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+              <span style={{ ...mono, fontSize: '9px', letterSpacing: '0.18em', color: 'var(--muted)', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+                GET ALERTS FOR THIS ZONE
+              </span>
+              <div style={{ flex: 1, height: '1px', background: 'var(--rule)' }} />
+            </div>
+
+            {alertStatus === 'success' ? (
+              <p style={{ ...mono, fontSize: '11px', color: '#1a6b3a', margin: 0 }}>
+                ✓ Alerts active for {zone.name}
+              </p>
+            ) : (
+              <>
+                <input
+                  type="email"
+                  value={alertEmail}
+                  onChange={e => { setAlertEmail(e.target.value); if (alertStatus === 'error') setAlertStatus('idle') }}
+                  placeholder="your@company.com"
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    border: '1px solid var(--rule)',
+                    background: 'transparent',
+                    ...mono,
+                    fontSize: '12px',
+                    color: 'var(--ink)',
+                    padding: '8px 10px',
+                    marginBottom: '8px',
+                    outline: 'none',
+                  }}
+                  onKeyDown={e => { if (e.key === 'Enter') handleAlertSubscribe() }}
+                />
+                <button
+                  onClick={handleAlertSubscribe}
+                  disabled={alertStatus === 'loading'}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    background: 'var(--ink)',
+                    color: '#fff',
+                    border: 'none',
+                    cursor: alertStatus === 'loading' ? 'default' : 'pointer',
+                    ...mono,
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase',
+                    padding: '11px',
+                    borderRadius: 0,
+                    opacity: alertStatus === 'loading' ? 0.7 : 1,
+                  }}
+                >
+                  {alertStatus === 'loading' ? 'SUBSCRIBING...' : 'SUBSCRIBE TO ALERTS'}
+                </button>
+                {alertStatus === 'error' && alertError && (
+                  <p style={{ ...mono, fontSize: '11px', color: '#c0392b', margin: '8px 0 0' }}>
+                    {alertError}
+                  </p>
+                )}
+              </>
+            )}
           </div>
         </>
       )}
