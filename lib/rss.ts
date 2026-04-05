@@ -1,16 +1,19 @@
 const RSS_FEEDS = [
-  { url: 'https://www.maritime-executive.com/rss', name: 'Maritime Executive' },
-  { url: 'https://www.tradewindsnews.com/rss', name: 'TradeWinds' },
-  { url: 'https://splash247.com/feed/', name: 'Splash247' },
+  { url: 'https://www.maritime-executive.com/rss',          name: 'Maritime Executive' },
+  { url: 'https://splash247.com/feed/',                      name: 'Splash247' },
+  { url: 'https://gcaptain.com/feed/',                       name: 'gCaptain' },
+  { url: 'https://www.hellenicshippingnews.com/feed/',       name: 'Hellenic Shipping News' },
+  { url: 'https://www.marinelink.com/news/rss',              name: 'MarineLink' },
+  { url: 'https://www.supplychaindive.com/feeds/news/',      name: 'Supply Chain Dive' },
 ]
 
 const ZONE_KEYWORDS: Record<string, string[]> = {
-  'Red Sea / Bab-el-Mandeb': ['red sea', 'houthi', 'bab-el-mandeb', 'yemen'],
-  'Strait of Hormuz': ['hormuz', 'iran', 'persian gulf'],
-  'Suez Canal': ['suez', 'canal authority'],
-  'Strait of Malacca': ['malacca', 'singapore strait'],
-  'Cape of Good Hope': ['cape of good hope', 'cape route', 'south africa diversion'],
-  'Gulf of Guinea': ['gulf of guinea', 'nigeria piracy', 'west africa piracy'],
+  'Red Sea / Bab-el-Mandeb': ['red sea', 'houthi', 'ansarallah', 'bab-el-mandeb', 'yemen', 'djibouti', 'aden', 'horn of africa'],
+  'Strait of Hormuz': ['hormuz', 'iran', 'persian gulf', 'irgc', 'revolutionary guard', 'tanker seizure', 'gulf tension'],
+  'Suez Canal': ['suez', 'canal authority', 'egypt canal', 'ismailia', 'canal transit', 'suez authority'],
+  'Strait of Malacca': ['malacca', 'singapore strait', 'piracy asia', 'indonesia strait'],
+  'Cape of Good Hope': ['cape of good hope', 'cape route', 'south africa diversion', 'durban', 'cape town port', 'southern africa'],
+  'Gulf of Guinea': ['gulf of guinea', 'nigeria piracy', 'west africa piracy', 'piracy', 'armed robbery', 'kidnapping', 'nigeria', 'ghana', 'benin'],
   'Strait of Gibraltar': ['gibraltar', 'algeciras'],
   'Port of Rotterdam': ['rotterdam', 'maasvlakte'],
   'Port of Antwerp': ['antwerp', 'port of antwerp'],
