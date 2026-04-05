@@ -38,14 +38,14 @@ Classify eventType as one of:
 
 proximityScore: 0.0 = geographically/operationally irrelevant to the Cape route; 1.0 = directly on the active trade lane or chokepoint
 
-Respond ONLY with valid JSON. No markdown, no preamble.`
+Respond with ONLY raw JSON. No markdown, no code fences, no backticks, no preamble. Your response must start with { and end with }.`
 
 export async function analyseNewsItem(
   rawContent: string,
   zoneName: string,
 ): Promise<NewsAnalysis> {
   const message = await getClient().messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 1024,
     system: SYSTEM_PROMPT,
     messages: [
@@ -72,6 +72,12 @@ Respond with this exact JSON structure:
     ],
   })
 
-  const text = message.content[0].type === 'text' ? message.content[0].text : '{}'
-  return JSON.parse(text) as NewsAnalysis
+  const rawText = message.content[0].type === 'text' ? message.content[0].text : '{}'
+  const cleaned = rawText
+    .trim()
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .trim()
+  return JSON.parse(cleaned) as NewsAnalysis
 }

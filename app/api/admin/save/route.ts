@@ -18,38 +18,53 @@ export async function POST(req: NextRequest) {
   const supabase = createServiceClient()
   const { analysis, cmrs } = result
 
-  // Insert news item
+  // Look up the real UUID from Supabase by zone name
+  const { data: zoneRow, error: zoneQueryError } = await supabase
+    .from('zones')
+    .select('id')
+    .eq('name', zone.name)
+    .single()
+
+  if (zoneQueryError || !zoneRow) {
+    return NextResponse.json(
+      { error: `Zone "${zone.name}" not found in database. Add it to the zones table first.` },
+      { status: 404 }
+    )
+  }
+
+  const zoneUuid = zoneRow.id
+
+  // Insert news item using the real UUID
   const { error: newsError } = await supabase.from('news_items').insert({
-    zone_id:          zoneId,
-    headline:         rawContent.split('\n')[0].slice(0, 255),
-    raw_content:      rawContent,
-    ai_summary:       analysis.summary,
-    ai_impact:        analysis.impact_lane,
-    ai_severity:      analysis.rawSeverity,
-    event_category:   analysis.eventCategory,
-    event_type:       analysis.eventType,
-    proximity_score:  analysis.proximityScore,
+    zone_id:           zoneUuid,
+    headline:          rawContent.split('\n')[0].slice(0, 255),
+    raw_content:       rawContent,
+    ai_summary:        analysis.summary,
+    ai_impact:         analysis.impact_lane,
+    ai_severity:       analysis.rawSeverity,
+    event_category:    analysis.eventCategory,
+    event_type:        analysis.eventType,
+    proximity_score:   analysis.proximityScore,
     credibility_score: credibility,
-    cmrs_score:       cmrs.score,
-    impact_zone:      analysis.impact_zone,
-    impact_region:    analysis.impact_region,
-    impact_lane:      analysis.impact_lane,
-    published_at:     new Date().toISOString(),
+    cmrs_score:        cmrs.score,
+    impact_zone:       analysis.impact_zone,
+    impact_region:     analysis.impact_region,
+    impact_lane:       analysis.impact_lane,
+    published_at:      new Date().toISOString(),
   })
 
   if (newsError) {
     return NextResponse.json({ error: newsError.message }, { status: 500 })
   }
 
-  // Update zone risk score
-  const { error: zoneError } = await supabase
+  // Update zone risk score using the real UUID
+  const { error: zoneUpdateError } = await supabase
     .from('zones')
     .update({ risk_score: cmrs.score, risk_level: cmrs.riskLevel, updated_at: new Date().toISOString() })
-    .eq('id', zoneId)
+    .eq('id', zoneUuid)
 
-  if (zoneError) {
-    // Non-fatal — news is saved, zone update failed
-    console.error('Zone update failed:', zoneError.message)
+  if (zoneUpdateError) {
+    console.error('Zone update failed:', zoneUpdateError.message)
   }
 
   return NextResponse.json({ ok: true })

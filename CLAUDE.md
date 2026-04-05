@@ -350,9 +350,9 @@ Respond in JSON:
 
 > Update this section each session
 
-- Phase: NOT STARTED
-- Last completed: —
-- Next task: Phase 1 — init project
+- Phase: Phase 3 complete, deployed to cargoradar.vercel.app
+- Last completed: Map with mist zones, trade lanes, zone panels
+- Next task: Phase 4 — News + AI, or continue trade lane polish
 
 ---
 
