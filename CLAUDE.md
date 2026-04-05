@@ -350,9 +350,9 @@ Respond in JSON:
 
 > Update this section each session
 
-- Phase: Phase 3 complete, deployed to cargoradar.vercel.app
-- Last completed: Map with mist zones, trade lanes, zone panels
-- Next task: Phase 4 — News + AI, or continue trade lane polish
+- Phase: Phase 4 complete, deployed to cargoradar.vercel.app
+- Last completed: CMRS scoring engine, AI analysis (claude-sonnet-4-6), admin intake page, zones seeded in Supabase
+- Next task: Phase 5 — Auth + Preferences, or build public news feed on ZonePanel
 
 ---
 
