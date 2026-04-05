@@ -22,6 +22,7 @@ export async function GET(request: Request) {
   let zonesProcessed = 0
   let newItemsAdded = 0
   const errors: string[] = []
+  const details: { zone: string; newItems: number; currentScore: number; riskLevel: string }[] = []
 
   try {
     const { data: zones, error: zonesError } = await supabase
@@ -133,6 +134,20 @@ export async function GET(request: Request) {
           }
         }
 
+        // Fetch updated score for details
+        const { data: updatedZone } = await supabase
+          .from('zones')
+          .select('risk_score, risk_level')
+          .eq('id', zone.id)
+          .single()
+
+        details.push({
+          zone: zone.name,
+          newItems: rssItems.length > 0 ? newItemsAdded - (details.reduce((s, d) => s + d.newItems, 0)) : 0,
+          currentScore: updatedZone?.risk_score ?? zone.risk_score,
+          riskLevel: updatedZone?.risk_level ?? zone.risk_level,
+        })
+
         zonesProcessed++
       } catch (zoneErr) {
         errors.push(
@@ -141,7 +156,7 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({ zonesProcessed, newItemsAdded, errors })
+    return NextResponse.json({ zonesProcessed, newItemsAdded, errors, details })
   } catch (err) {
     return NextResponse.json(
       {
