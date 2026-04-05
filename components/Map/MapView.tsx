@@ -43,8 +43,8 @@ export default function MapView({ onZoneClick }: Props) {
     const map = new mapboxgl.Map({
       container: containerRef.current,
       style: 'mapbox://styles/mapbox/light-v11',
-      center: [20, 20],
-      zoom: 2.1,
+      center: [40.0, 10.0],
+      zoom: 2.0,
       projection: { name: 'mercator' },
       attributionControl: false,
     })
