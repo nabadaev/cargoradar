@@ -1,10 +1,12 @@
 const RSS_FEEDS = [
-  { url: 'https://www.maritime-executive.com/rss',          name: 'Maritime Executive' },
   { url: 'https://splash247.com/feed/',                      name: 'Splash247' },
   { url: 'https://gcaptain.com/feed/',                       name: 'gCaptain' },
   { url: 'https://www.hellenicshippingnews.com/feed/',       name: 'Hellenic Shipping News' },
   { url: 'https://www.marinelink.com/news/rss',              name: 'MarineLink' },
   { url: 'https://www.supplychaindive.com/feeds/news/',      name: 'Supply Chain Dive' },
+  { url: 'https://www.seatrade-maritime.com/rss.xml',        name: 'Seatrade Maritime' },
+  { url: 'https://www.freightwaves.com/news/feed',           name: 'FreightWaves' },
+  { url: 'https://theloadstar.com/feed/',                    name: 'The Loadstar' },
 ]
 
 const ZONE_KEYWORDS: Record<string, string[]> = {
