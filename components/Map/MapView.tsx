@@ -4,14 +4,15 @@ import { useEffect, useRef } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { ZONES, TRADE_LANES } from '@/lib/mapdata'
+import { getSupabaseClient } from '@/lib/supabase'
 import type { Zone } from '@/lib/mapdata'
 
-// Risk colors per spec
+// Risk colors — aligned with ZonePanel and design system
 const RISK_COLOR: Record<string, string> = {
-  critical: '#D4291A',
-  high:     '#C97A1A',
-  medium:   '#B5901A',
-  low:      '#2E7D45',
+  critical: '#c0392b',
+  high:     '#b8680a',
+  medium:   '#b8680a',
+  low:      '#1a6b3a',
 }
 
 const riskMatch = (colors: Record<string, string>) => [
@@ -23,15 +24,38 @@ const riskMatch = (colors: Record<string, string>) => [
   '#6e6e6e',
 ]
 
+// Build GeoJSON FeatureCollection for hot zones,
+// merging live scores from Supabase over the static defaults
+function buildZoneGeoJSON(
+  liveScores: Record<string, { risk_score: number; risk_level: string }>,
+) {
+  return {
+    type: 'FeatureCollection' as const,
+    features: ZONES.map(z => {
+      const live = liveScores[z.name]
+      return {
+        type: 'Feature' as const,
+        properties: {
+          id:        z.id,
+          name:      z.name,
+          riskLevel: live?.risk_level ?? z.riskLevel,
+          riskScore: live?.risk_score ?? z.riskScore,
+        },
+        geometry: { type: 'Point' as const, coordinates: z.coordinates },
+      }
+    }),
+  }
+}
 
 interface Props {
   onZoneClick: (zone: Zone) => void
 }
 
 export default function MapView({ onZoneClick }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const mapRef      = useRef<mapboxgl.Map | null>(null)
-  const callbackRef = useRef(onZoneClick)
+  const containerRef  = useRef<HTMLDivElement>(null)
+  const mapRef        = useRef<mapboxgl.Map | null>(null)
+  const callbackRef   = useRef(onZoneClick)
+  const intervalRef   = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => { callbackRef.current = onZoneClick })
 
@@ -54,8 +78,33 @@ export default function MapView({ onZoneClick }: Props) {
 
     mapRef.current = map
 
+    // Fetch live zone scores from Supabase and update the map source
+    async function refreshZoneScores() {
+      if (!mapRef.current) return
+      try {
+        const supabase = getSupabaseClient()
+        const { data } = await supabase
+          .from('zones')
+          .select('name, risk_score, risk_level')
+
+        const liveScores: Record<string, { risk_score: number; risk_level: string }> = {}
+        if (data) {
+          for (const row of data) {
+            liveScores[row.name] = { risk_score: row.risk_score, risk_level: row.risk_level }
+          }
+        }
+
+        const source = mapRef.current.getSource('hot-zones') as mapboxgl.GeoJSONSource | undefined
+        if (source) {
+          source.setData(buildZoneGeoJSON(liveScores))
+        }
+      } catch {
+        // Silently continue — map will retain last known data
+      }
+    }
+
     map.on('load', () => {
-      // ── Trade lane lines ────────────────────────────────────────
+      // ── Trade lane lines ──────────────────────────────────────
       map.addSource('trade-lanes', {
         type: 'geojson',
         data: {
@@ -81,20 +130,12 @@ export default function MapView({ onZoneClick }: Props) {
         },
       })
 
-      // ── Hot zone circles ────────────────────────────────────────
+      // ── Hot zone circles — initialise with static data ────────
       map.addSource('hot-zones', {
         type: 'geojson',
-        data: {
-          type: 'FeatureCollection',
-          features: ZONES.map(z => ({
-            type: 'Feature' as const,
-            properties: { id: z.id, name: z.name, riskLevel: z.riskLevel, riskScore: z.riskScore },
-            geometry: { type: 'Point' as const, coordinates: z.coordinates },
-          })),
-        },
+        data: buildZoneGeoJSON({}),   // static defaults; refreshed immediately below
       })
 
-      // Layer 1 — outer mist (large, very low opacity)
       map.addLayer({
         id: 'hot-zones-mist-outer',
         type: 'circle',
@@ -107,7 +148,6 @@ export default function MapView({ onZoneClick }: Props) {
         },
       })
 
-      // Layer 2 — mid glow
       map.addLayer({
         id: 'hot-zones-mist-mid',
         type: 'circle',
@@ -120,7 +160,6 @@ export default function MapView({ onZoneClick }: Props) {
         },
       })
 
-      // Layer 3 — core (small, most visible but still soft)
       map.addLayer({
         id: 'hot-zones-mist-core',
         type: 'circle',
@@ -133,7 +172,7 @@ export default function MapView({ onZoneClick }: Props) {
         },
       })
 
-      // Risk score label — sits above all mist layers
+      // Risk score label
       map.addLayer({
         id: 'hot-zones-scores',
         type: 'symbol',
@@ -152,8 +191,7 @@ export default function MapView({ onZoneClick }: Props) {
         },
       })
 
-      // ── Interaction ─────────────────────────────────────────────
-      // Click on any mist layer
+      // ── Interaction ───────────────────────────────────────────
       for (const layerId of ['hot-zones-mist-outer', 'hot-zones-mist-mid', 'hot-zones-mist-core']) {
         map.on('click', layerId, e => {
           const props = e.features?.[0]?.properties
@@ -164,9 +202,17 @@ export default function MapView({ onZoneClick }: Props) {
         map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer' })
         map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = '' })
       }
+
+      // ── Fetch live scores immediately, then every 5 minutes ───
+      refreshZoneScores()
+      intervalRef.current = setInterval(refreshZoneScores, 5 * 60 * 1000)
     })
 
-    return () => { map.remove(); mapRef.current = null }
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      map.remove()
+      mapRef.current = null
+    }
   }, [])
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
