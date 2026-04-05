@@ -46,14 +46,34 @@ function formatDate(iso: string) {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()
 }
 
-function ImpactRow({ label, text }: { label: string; text: string | null }) {
+// Section label: 9px mono uppercase, wide tracking
+const sectionLabel: React.CSSProperties = {
+  fontFamily: 'var(--mono)',
+  fontSize: '9px',
+  letterSpacing: '0.18em',
+  textTransform: 'uppercase' as const,
+  color: 'var(--muted)',
+  marginBottom: '8px',
+}
+
+// Sub-header with extending rule line: [LABEL ————————]
+function SubHeader({ label }: { label: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', marginTop: '12px' }}>
+      <span style={{ fontFamily: 'var(--mono)', fontSize: '9px', letterSpacing: '0.14em', color: 'var(--muted)', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+        {label}
+      </span>
+      <div style={{ flex: 1, height: '1px', background: 'var(--rule)' }} />
+    </div>
+  )
+}
+
+function ImpactBlock({ label, text }: { label: string; text: string | null }) {
   if (!text) return null
   return (
-    <div style={{ marginTop: '10px' }}>
-      <div style={{ ...mono, fontSize: '9px', letterSpacing: '0.14em', color: 'var(--muted)', marginBottom: '3px' }}>
-        {label}
-      </div>
-      <p style={{ fontFamily: 'var(--body)', fontSize: '12px', color: 'var(--ink)', lineHeight: 1.6, margin: 0 }}>
+    <div>
+      <SubHeader label={label} />
+      <p style={{ fontFamily: 'var(--body)', fontSize: '13px', color: 'var(--ink)', lineHeight: 1.6, margin: 0 }}>
         {text}
       </p>
     </div>
@@ -185,17 +205,18 @@ export default function ZonePanel({ zone, onClose }: Props) {
             {!loading && newsItems.map((item, i) => {
               const color = riskColor(item.cmrs_score)
               return (
-                <div key={i} style={{ borderTop: '1px solid var(--rule)', padding: '14px 0' }}>
-                  {/* Date + score + type */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                <div key={i} style={{ borderTop: '1px solid var(--rule)', paddingTop: '24px', paddingBottom: '24px', marginBottom: i < newsItems.length - 1 ? '24px' : 0 }}>
+
+                  {/* Meta row: date + CMRS badge + event type + category */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
                     <span style={{ ...mono, fontSize: '9px', letterSpacing: '0.1em', color: 'var(--muted)' }}>
                       {formatDate(item.created_at)}
                     </span>
-                    {item.cmrs_score && (
+                    {item.cmrs_score != null && (
                       <span style={{
                         ...mono, fontSize: '9px', fontWeight: 600,
                         color, background: `${color}18`,
-                        padding: '1px 6px', borderRadius: '2px',
+                        padding: '2px 7px', borderRadius: '2px',
                       }}>
                         CMRS {item.cmrs_score.toFixed(1)}
                       </span>
@@ -204,7 +225,7 @@ export default function ZonePanel({ zone, onClose }: Props) {
                       <span style={{
                         ...mono, fontSize: '9px', fontWeight: 600,
                         color: 'var(--muted)', border: '1px solid var(--rule)',
-                        padding: '1px 6px', borderRadius: '2px',
+                        padding: '2px 7px', borderRadius: '2px',
                       }}>
                         {item.event_type}
                       </span>
@@ -216,19 +237,25 @@ export default function ZonePanel({ zone, onClose }: Props) {
                     )}
                   </div>
 
-                  {/* Summary */}
-                  <p style={{ fontFamily: 'var(--body)', fontSize: '13px', color: 'var(--ink)', lineHeight: 1.55, marginBottom: '4px' }}>
+                  {/* NEWS SUMMARY block */}
+                  <div style={sectionLabel}>NEWS SUMMARY</div>
+                  <p style={{ fontFamily: 'var(--body)', fontSize: '13px', color: 'var(--ink)', lineHeight: 1.6, margin: 0 }}>
                     {item.ai_summary}
                   </p>
 
-                  {/* Impact sections */}
-                  <ImpactRow label="ZONE IMPACT"   text={item.impact_zone} />
-                  <ImpactRow label="REGIONAL"      text={item.impact_region} />
-                  <ImpactRow label="LANE IMPACT"   text={item.impact_lane} />
+                  {/* IMPACT ANALYSIS block */}
+                  {(item.impact_zone || item.impact_region || item.impact_lane) && (
+                    <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--rule)' }}>
+                      <div style={sectionLabel}>IMPACT ANALYSIS</div>
+                      <ImpactBlock label="ZONE IMPACT"                  text={item.impact_zone} />
+                      <ImpactBlock label="REGIONAL"                     text={item.impact_region} />
+                      <ImpactBlock label="LANE IMPACT  FAR EAST → EUROPE" text={item.impact_lane} />
+                    </div>
+                  )}
 
                   {/* Source */}
                   {item.source_name && (
-                    <div style={{ ...mono, fontSize: '10px', color: 'var(--muted)', marginTop: '8px' }}>
+                    <div style={{ ...mono, fontSize: '10px', color: 'var(--muted)', marginTop: '14px' }}>
                       {item.source_name}
                     </div>
                   )}
