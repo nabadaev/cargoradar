@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/daily-intel",
+      "schedule": "0 18 * * *"
+    }
+  ]
+}

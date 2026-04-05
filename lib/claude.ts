@@ -81,3 +81,39 @@ Respond with this exact JSON structure:
     .trim()
   return JSON.parse(cleaned) as NewsAnalysis
 }
+
+export async function generateZoneSituation(
+  zoneName: string,
+  recentItems: { ai_summary: string; impact_lane: string; created_at: string }[],
+): Promise<string> {
+  if (recentItems.length === 0) {
+    throw new Error('No recent items available for zone situation generation')
+  }
+
+  const itemsText = recentItems
+    .map(
+      (item, i) =>
+        `[${i + 1}] ${item.created_at.slice(0, 10)}: ${item.ai_summary} Operational: ${item.impact_lane}`,
+    )
+    .join('\n')
+
+  const message = await getClient().messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 256,
+    system:
+      'You are a maritime freight analyst. Write exactly 3 sentences summarizing the current situation for the specified zone based on recent intelligence items. Be specific, factual, and focused on operational implications for freight operators. No preamble, no markdown. Your response must be exactly 3 sentences.',
+    messages: [
+      {
+        role: 'user',
+        content: `Zone: ${zoneName}\n\nRecent intelligence:\n${itemsText}\n\nWrite exactly 3 sentences summarizing the current situation for ${zoneName}.`,
+      },
+    ],
+  })
+
+  const rawText = message.content[0].type === 'text' ? message.content[0].text : ''
+  return rawText
+    .trim()
+    .replace(/^```[a-z]*\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .trim()
+}
