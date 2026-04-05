@@ -135,59 +135,45 @@ export const TRADE_LANES: TradeLane[] = [
     riskLevel: 'high',
     coordinates: [
       [121.5, 31.2],  // Shanghai
-      [119.0, 26.0],  // East China Sea south
-      [116.0, 22.0],  // South China Sea north
-      [114.0, 18.0],  // South China Sea
-      [111.0, 12.0],  // South China Sea south
-      [108.0, 6.0],   // Approaching Malacca
-      [105.5, 3.0],   // Malacca north approach
+      [121.0, 25.0],  // Taiwan Strait south
+      [118.0, 18.0],  // South China Sea
+      [111.0, 8.0],   // South China Sea south
+      [104.5, 1.5],   // Strait of Malacca north
       [103.8, 1.3],   // Strait of Malacca
-      [101.0, 2.5],   // Malacca exit
-      [97.0, 4.0],    // Andaman Sea
-      [92.0, 5.5],    // Bay of Bengal west
-      [87.0, 5.0],    // Indian Ocean north
-      [83.0, 4.0],    // Sri Lanka south
-      [80.0, 6.9],    // Indian Ocean west
-      [76.0, 5.0],    // Indian Ocean mid
-      [72.0, 1.0],    // Indian Ocean central
-      [69.0, -5.0],   // Indian Ocean south heading
-      [66.0, -12.0],  // Indian Ocean south
-      [63.0, -18.0],  // Mozambique Channel approach
-      [60.0, -22.0],  // Indian Ocean deep south
-      [52.0, -28.0],  // South Indian Ocean
-      [42.0, -33.0],  // Approaching Cape
-      [32.0, -36.0],  // South Africa south
-      [22.0, -36.0],  // Cape corridor
-      [18.4, -34.4],  // Cape of Good Hope
-      [15.0, -32.0],  // Cape north
-      [10.0, -28.0],  // West Africa south
-      [6.0, -22.0],   // Atlantic south
-      [3.0, -15.0],   // South Atlantic
-      [1.0, -8.0],    // South Atlantic north
-      [0.0, -25.0],   // South Atlantic mid — NOTE: route doubles back here for curve
-      [2.0, -5.0],    // Equatorial Atlantic
-      [3.5, 2.0],     // Gulf of Guinea
-      [5.0, 0.0],     // Gulf of Guinea equator
-      [4.0, 5.0],     // Gulf of Guinea north
-      [2.0, 8.0],     // West Africa coast north
-      [-1.0, 11.0],   // West Africa
-      [-5.0, 14.0],   // West Africa
-      [-10.0, 15.0],  // West Africa open ocean
-      [-14.0, 18.0],  // Off Senegal
-      [-17.0, 22.0],  // Off Mauritania
-      [-19.0, 27.0],  // Off Western Sahara
-      [-17.0, 32.0],  // Off Morocco
-      [-10.0, 36.0],  // Approaching Gibraltar
+      [98.0, 4.0],    // Andaman Sea
+      [88.0, 6.0],    // Indian Ocean east
+      [80.0, 6.0],    // Sri Lanka / Colombo
+      [72.0, 5.0],    // Indian Ocean central
+      [65.0, 0.0],    // Indian Ocean mid
+      [58.0, -8.0],   // Indian Ocean southwest
+      [52.0, -18.0],  // Mozambique Channel approach
+      [42.0, -26.0],  // South Indian Ocean
+      [32.0, -32.0],  // Approaching Cape
+      [20.0, -35.5],  // Cape of Good Hope
+      [16.0, -33.0],  // Cape Town offshore
+      [12.0, -28.0],  // South Atlantic north
+      [8.0, -20.0],   // Atlantic, offshore Namibia
+      [5.0, -10.0],   // Atlantic, offshore Angola
+      [3.0, 1.5],     // Gulf of Guinea (hot zone marker here)
+      [1.0, 4.0],     // Gulf of Guinea north
+      [-2.0, 5.0],    // Offshore Ivory Coast/Ghana
+      [-8.0, 5.0],    // Offshore Liberia
+      [-15.0, 10.0],  // Offshore Guinea
+      [-17.5, 14.5],  // Offshore Dakar, open ocean
+      [-18.0, 20.0],  // Offshore Mauritania, open ocean
+      [-17.0, 28.0],  // Offshore Western Sahara
+      [-15.0, 33.0],  // Offshore Morocco
+      [-9.5, 36.5],   // Atlantic approach to Gibraltar
       [-5.6, 35.9],   // Strait of Gibraltar
-      [-4.0, 38.5],   // Mediterranean / Atlantic split
-      [-7.0, 40.0],   // Portugal coast
-      [-8.0, 43.5],   // NW Spain
-      [-6.0, 46.5],   // Bay of Biscay south
-      [-5.0, 45.0],   // Bay of Biscay
-      [-4.0, 48.0],   // Bay of Biscay north
-      [-3.0, 49.5],   // English Channel approach
-      [-1.0, 50.5],   // English Channel west
-      [2.0, 51.2],    // North Sea south
+      [-2.0, 36.5],   // Mediterranean west entry
+      [0.0, 38.0],    // Mediterranean, east of Gibraltar
+      [-1.0, 43.5],   // Atlantic north of Spain, offshore
+      [-4.0, 44.5],   // Bay of Biscay south, open water
+      [-5.5, 47.5],   // Bay of Biscay mid, open water
+      [-4.5, 50.0],   // English Channel approach
+      [-3.0, 51.5],   // Celtic Sea
+      [-1.5, 51.8],   // English Channel
+      [1.3, 51.9],    // Felixstowe approach
       [4.1, 51.9],    // Rotterdam
     ],
   },
