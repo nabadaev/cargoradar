@@ -29,12 +29,10 @@ function SectionLabel({ label }: { label: string }) {
 }
 
 export default function SettingsPage() {
-  const session   = useSession()
-  const router    = useRouter()
-  const userId    = session?.user?.id       // stable string dep
-  const userEmail = session?.user?.email ?? ''
+  const session = useSession()
+  const router  = useRouter()
+  const userId  = session?.user?.id  // stable string dep
 
-  // Live zones — starts as static fallback, overwritten with Supabase scores
   const [zones, setZones]       = useState<Zone[]>(ZONES)
   const [subs, setSubs]         = useState<SubMap>({})
   const [loading, setLoading]   = useState(true)
@@ -47,50 +45,55 @@ export default function SettingsPage() {
     if (session === null) router.replace('/login')
   }, [session, router])
 
-  // FIX 3: Fetch live zone scores from Supabase on mount — no auth needed.
-  // Falls back to static ZONES if the fetch fails.
+  // Fetch live zone scores from Supabase on mount — no auth needed
   useEffect(() => {
     let cancelled = false
     getSupabaseClient()
       .from('zones')
       .select('name, risk_score, risk_level')
-      .then(({ data }) => {
-        if (cancelled || !data || data.length === 0) return
+      .then(({ data, error }) => {
+        if (cancelled || error || !data || data.length === 0) return
+        type ZoneRow = { name: string; risk_score: number; risk_level: string }
         setZones(ZONES.map(z => {
-          const live = data.find((d: { name: string; risk_score: number; risk_level: string }) => d.name === z.name)
-          return live
-            ? { ...z, riskScore: Number(live.risk_score), riskLevel: live.risk_level as RiskLevel }
-            : z
+          const live = (data as ZoneRow[]).find(d => d.name === z.name)
+          return live ? { ...z, riskScore: Number(live.risk_score), riskLevel: live.risk_level as RiskLevel } : z
         }))
-      }, () => { /* keep static fallback on error */ })
+      })
     return () => { cancelled = true }
-  }, []) // once on mount only
+  }, [])
 
-  // Fetch subscriptions — reads zone_alerts (always exists) and optionally
-  // user_subscriptions (silently ignored if migration 005 not yet run).
+  // Fetch subscriptions once userId is known.
+  // Reads zone_alerts (requires SELECT policy — see migration 006).
+  // Silently ignores user_subscriptions if table is missing.
   useEffect(() => {
-    if (!userId || !userEmail) return
+    if (!userId) return
     let cancelled = false
 
     async function load() {
       const supabase = getSupabaseClient()
       const merged: SubMap = {}
 
-      // zone_alerts — always exists, catches ZonePanel sign-ups
-      const { data: alertRows } = await supabase
-        .from('zone_alerts')
-        .select('zone_name')
-        .eq('email', userEmail)
-      for (const row of alertRows ?? []) {
-        merged[row.zone_name] = { freq: 'instant' }
-      }
+      // Get user email from the auth client — most reliable source
+      const { data: { user } } = await supabase.auth.getUser()
+      const email = user?.email ?? ''
 
-      // user_subscriptions — silently skip if table missing
-      const { data: subRows } = await supabase
-        .from('user_subscriptions')
-        .select('zone_name, alert_frequency')
-      for (const row of subRows ?? []) {
-        merged[row.zone_name] = { freq: row.alert_frequency as AlertFreq }
+      if (email) {
+        // zone_alerts — catches ZonePanel sign-ups (needs SELECT policy from migration 006)
+        const { data: alertRows } = await supabase
+          .from('zone_alerts')
+          .select('zone_name')
+          .eq('email', email)
+        for (const row of alertRows ?? []) {
+          merged[row.zone_name] = { freq: 'instant' }
+        }
+
+        // user_subscriptions — silently skip if missing
+        const { data: subRows } = await supabase
+          .from('user_subscriptions')
+          .select('zone_name, alert_frequency')
+        for (const row of subRows ?? []) {
+          merged[row.zone_name] = { freq: row.alert_frequency as AlertFreq }
+        }
       }
 
       if (!cancelled) { setSubs(merged); setLoading(false) }
@@ -98,7 +101,7 @@ export default function SettingsPage() {
 
     load().catch(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [userId, userEmail])
+  }, [userId])
 
   // Cleanup timers on unmount
   useEffect(() => {
@@ -114,13 +117,26 @@ export default function SettingsPage() {
     }, 3000)
   }
 
-  // FIX 2: All writes go to zone_alerts only — no user_subscriptions writes.
-  // zone_alerts uses email as key; always exists; cron picks it up directly.
   async function toggle(zoneName: string, riskLevel: RiskLevel, riskScore: number) {
-    if (!userEmail) return
+    console.log('[toggle] called', { zoneName, userId, sessionEmail: session?.user?.email })
+
+    // Always get email fresh from the Supabase client — the closure value
+    // from session?.user?.email can be stale if the client hasn't rehydrated yet
+    const supabase = getSupabaseClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const email = user?.email ?? session?.user?.email ?? ''
+
+    console.log('[toggle] resolved email:', email, '| wasSubscribed:', !!subs[zoneName])
+
+    if (!email) {
+      console.warn('[toggle] no email available — cannot write to zone_alerts')
+      showConfirm(zoneName, 'Sign in required', 'var(--red)')
+      return
+    }
+
     const wasSubscribed = !!subs[zoneName]
 
-    // Optimistic update
+    // Optimistic update — immediate UI response
     setSubs(prev => {
       const next = { ...prev }
       if (wasSubscribed) { delete next[zoneName] } else { next[zoneName] = { freq: 'instant' } }
@@ -129,35 +145,41 @@ export default function SettingsPage() {
     setToggling(t => ({ ...t, [zoneName]: true }))
 
     try {
-      const supabase = getSupabaseClient()
-
       if (wasSubscribed) {
-        // Unsubscribe: delete from zone_alerts only
+        // Unsubscribe — requires DELETE policy on zone_alerts (migration 006)
         const { error } = await supabase
           .from('zone_alerts')
           .delete()
           .eq('zone_name', zoneName)
-          .eq('email', userEmail)
-        if (error) throw error
+          .eq('email', email)
+        if (error) {
+          console.error('[toggle] unsubscribe error:', error)
+          throw error
+        }
+        console.log('[toggle] unsubscribed from', zoneName)
         showConfirm(zoneName, `✗ Unsubscribed from ${zoneName}`, 'var(--muted)')
       } else {
-        // Subscribe: upsert into zone_alerts only
+        // Subscribe — INSERT policy is WITH CHECK (true), works for all users
         const { error } = await supabase
           .from('zone_alerts')
-          .upsert({ email: userEmail, zone_name: zoneName }, { onConflict: 'email,zone_name' })
-        if (error) throw error
+          .upsert({ email, zone_name: zoneName }, { onConflict: 'email,zone_name' })
+        if (error) {
+          console.error('[toggle] subscribe error:', error)
+          throw error
+        }
+        console.log('[toggle] subscribed to', zoneName)
 
         // Fire-and-forget confirmation email
         fetch('/api/alerts/confirm-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: userEmail, zone_name: zoneName, risk_level: riskLevel, risk_score: riskScore }),
+          body: JSON.stringify({ email, zone_name: zoneName, risk_level: riskLevel, risk_score: riskScore }),
         }).catch(() => {})
 
         showConfirm(zoneName, `✓ Subscribed to ${zoneName} alerts`, '#1a6b3a')
       }
     } catch {
-      // Revert optimistic update on failure
+      // Revert optimistic update
       setSubs(prev => {
         const next = { ...prev }
         if (wasSubscribed) { next[zoneName] = { freq: 'instant' } } else { delete next[zoneName] }
@@ -211,7 +233,7 @@ export default function SettingsPage() {
             MAP
           </Link>
           <span style={{ ...mono, fontSize: '11px', letterSpacing: '0.04em', color: 'var(--muted)' }}>
-            {userEmail}
+            {session.user.email}
           </span>
           <button onClick={handleSignOut} style={{
             ...mono, fontSize: '11px', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
@@ -226,7 +248,6 @@ export default function SettingsPage() {
       {/* Content */}
       <div style={{ maxWidth: '820px', margin: '0 auto', padding: '56px 48px' }}>
 
-        {/* Header */}
         <div style={{ marginBottom: '48px' }}>
           <SectionLabel label="ALERT SETTINGS" />
           <p style={{ ...body, fontSize: '14px', color: 'var(--muted)', lineHeight: 1.65 }}>
@@ -239,7 +260,7 @@ export default function SettingsPage() {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '12px 0', borderBottom: '1px solid var(--rule)', marginBottom: '8px',
         }}>
-          <span style={{ ...mono, fontSize: '10px', letterSpacing: '0.14em', color: 'var(--muted)', textTransform: 'uppercase' }}>
+          <span style={{ ...mono, fontSize: '10px', letterSpacing: '0.14em', color: activeCount > 0 ? 'var(--ink)' : 'var(--muted)', textTransform: 'uppercase', fontWeight: activeCount > 0 ? 600 : 400 }}>
             {activeCount > 0 ? `${activeCount} ACTIVE SUBSCRIPTION${activeCount !== 1 ? 'S' : ''}` : 'NO ACTIVE SUBSCRIPTIONS'}
           </span>
           <span style={{ ...mono, fontSize: '10px', color: 'var(--muted)', letterSpacing: '0.08em' }}>
@@ -247,7 +268,7 @@ export default function SettingsPage() {
           </span>
         </div>
 
-        {/* Zone rows — always render, uses live Supabase scores */}
+        {/* Zone rows */}
         {zones.map((zone) => {
           const subscribed = !!subs[zone.name]
           const isToggling = toggling[zone.name] ?? false
@@ -257,10 +278,12 @@ export default function SettingsPage() {
             <div key={zone.id} style={{
               display: 'flex', alignItems: 'center', gap: '16px',
               padding: '16px 0', borderBottom: '1px solid var(--rule)',
+              background: subscribed ? 'var(--off)' : 'transparent',
+              marginLeft: '-12px', marginRight: '-12px', paddingLeft: '12px', paddingRight: '12px',
             }}>
-              {/* Zone name + inline confirm */}
+              {/* Zone name + confirm */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ ...mono, fontSize: '12px', fontWeight: 500, color: 'var(--ink)', marginBottom: '2px' }}>
+                <div style={{ ...mono, fontSize: '12px', fontWeight: subscribed ? 600 : 500, color: 'var(--ink)', marginBottom: '2px' }}>
                   {zone.name}
                 </div>
                 {confirm && (
@@ -271,9 +294,7 @@ export default function SettingsPage() {
               </div>
 
               {/* Live risk badge */}
-              <div style={{ flexShrink: 0 }}>
-                <RiskScore level={zone.riskLevel} score={zone.riskScore} />
-              </div>
+              <RiskScore level={zone.riskLevel} score={zone.riskScore} />
 
               {/* Subscribe / Unsubscribe */}
               <button
@@ -287,6 +308,7 @@ export default function SettingsPage() {
                   background: subscribed ? 'var(--ink)' : 'transparent',
                   color: subscribed ? '#fff' : 'var(--ink)',
                   border: subscribed ? '1px solid var(--ink)' : '1px solid var(--rule)',
+                  transition: 'background 0.1s, color 0.1s',
                 }}
               >
                 {isToggling ? '...' : subscribed ? 'SUBSCRIBED' : 'SUBSCRIBE'}
@@ -304,7 +326,7 @@ export default function SettingsPage() {
                 SIGNED IN AS
               </div>
               <div style={{ ...mono, fontSize: '13px', fontWeight: 500, color: 'var(--ink)' }}>
-                {userEmail}
+                {session.user.email}
               </div>
             </div>
             <button onClick={handleSignOut} style={{
