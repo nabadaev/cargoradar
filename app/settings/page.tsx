@@ -76,11 +76,12 @@ export default function SettingsPage() {
 
       const map: SubMap = {}
       if (email) {
-        const { data } = await supabase
+        const result = await supabase
           .from('zone_alerts')
           .select('zone_name')
           .eq('email', email)
-        for (const row of data ?? []) {
+        const rows = result.data as { zone_name: string }[] | null
+        for (const row of rows ?? []) {
           map[row.zone_name] = {}
         }
       }
