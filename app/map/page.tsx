@@ -3,13 +3,25 @@
 import { useState } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import ZonePanel from '@/components/ZonePanel'
+import { useSession } from '@/lib/auth'
+import { getSupabaseClient } from '@/lib/supabase'
 import type { Zone } from '@/lib/mapdata'
 
 // Mapbox requires client-only rendering — no SSR
 const MapView = dynamic(() => import('@/components/Map/MapView'), { ssr: false })
 
 function MapNav({ search, onSearch }: { search: string; onSearch: (v: string) => void }) {
+  const session = useSession()
+  const router  = useRouter()
+
+  async function handleSignOut() {
+    const supabase = getSupabaseClient()
+    await supabase.auth.signOut()
+    router.refresh()
+  }
+
   return (
     <nav style={{
       height: '56px',
@@ -60,19 +72,54 @@ function MapNav({ search, onSearch }: { search: string; onSearch: (v: string) =>
         />
       </div>
 
-      <Link href="/" style={{
-        fontFamily: 'var(--mono)',
-        fontSize: '11px',
-        fontWeight: 600,
-        letterSpacing: '0.12em',
-        color: '#fff',
-        background: 'var(--ink)',
-        padding: '7px 16px',
-        textDecoration: 'none',
-        textTransform: 'uppercase',
-      }}>
-        JOIN WAITLIST
-      </Link>
+      {session ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <Link href="/settings" style={{
+            fontFamily: 'var(--mono)',
+            fontSize: '11px',
+            fontWeight: 600,
+            letterSpacing: '0.12em',
+            color: 'var(--ink)',
+            border: '1px solid var(--rule)',
+            padding: '7px 14px',
+            textDecoration: 'none',
+            textTransform: 'uppercase',
+          }}>
+            ALERTS
+          </Link>
+          <button
+            onClick={handleSignOut}
+            style={{
+              fontFamily: 'var(--mono)',
+              fontSize: '11px',
+              fontWeight: 600,
+              letterSpacing: '0.12em',
+              color: 'var(--muted)',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              textTransform: 'uppercase',
+              padding: '7px 0',
+            }}
+          >
+            SIGN OUT
+          </button>
+        </div>
+      ) : session === null ? (
+        <Link href="/login" style={{
+          fontFamily: 'var(--mono)',
+          fontSize: '11px',
+          fontWeight: 600,
+          letterSpacing: '0.12em',
+          color: '#fff',
+          background: 'var(--ink)',
+          padding: '7px 16px',
+          textDecoration: 'none',
+          textTransform: 'uppercase',
+        }}>
+          SIGN IN
+        </Link>
+      ) : null /* loading — show nothing */}
     </nav>
   )
 }
