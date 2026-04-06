@@ -350,9 +350,9 @@ Respond in JSON:
 
 > Update this section each session
 
-- Phase: Phase 4 complete, deployed to cargoradar.vercel.app
-- Last completed: CMRS scoring engine, AI analysis (claude-sonnet-4-6), admin intake page, zones seeded in Supabase
-- Next task: Phase 5 — Auth + Preferences, or build public news feed on ZonePanel
+- Phase: Phase 5 complete, deployed to cargoradar.vercel.app
+- Last completed: Magic-link auth, /login, /auth/callback, /settings zone subscription management, map nav auth state, user_subscriptions table with RLS
+- Next task: Phase 6 — Email Alerts (weekly digest, alert frequency from user_subscriptions)
 
 ---
 
