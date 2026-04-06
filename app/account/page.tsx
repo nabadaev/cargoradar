@@ -13,6 +13,7 @@ import type { Zone, RiskLevel } from '@/lib/mapdata'
 const mono: React.CSSProperties = { fontFamily: 'var(--mono)' }
 const body: React.CSSProperties = { fontFamily: 'var(--body)' }
 
+type PlanType = 'free' | 'pro' | 'sme' | 'team'
 type SubMap = Record<string, Record<string, never>>
 interface Confirm { msg: string; color: string }
 
@@ -52,18 +53,31 @@ export default function AccountPage() {
   const router  = useRouter()
   const userId  = session?.user?.id
 
-  const [zones, setZones]       = useState<Zone[]>(ZONES)
-  const [subs, setSubs]         = useState<SubMap>({})
-  const [loading, setLoading]   = useState(true)
-  const [toggling, setToggling] = useState<Record<string, boolean>>({})
-  const [confirms, setConfirms] = useState<Record<string, Confirm>>({})
-  const [plan, setPlan]         = useState<'free' | 'pro' | 'team'>('free')
+  const [zones, setZones]             = useState<Zone[]>(ZONES)
+  const [subs, setSubs]               = useState<SubMap>({})
+  const [loading, setLoading]         = useState(true)
+  const [toggling, setToggling]       = useState<Record<string, boolean>>({})
+  const [confirms, setConfirms]       = useState<Record<string, Confirm>>({})
+  const [plan, setPlan]               = useState<PlanType>('free')
+  const [loadingPlan, setLoadingPlan] = useState<'pro' | 'sme' | null>(null)
+  const [showBanner, setShowBanner]   = useState(false)
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
   // Auth guard
   useEffect(() => {
     if (session === null) router.replace('/login?next=/account')
   }, [session, router])
+
+  // Check for ?upgraded=true in URL, show banner and auto-dismiss
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('upgraded') === 'true') {
+      setShowBanner(true)
+      const t = setTimeout(() => setShowBanner(false), 8000)
+      return () => clearTimeout(t)
+    }
+  }, [])
 
   // Fetch live zone risk scores
   useEffect(() => {
@@ -103,14 +117,14 @@ export default function AccountPage() {
         }
       }
 
-      // Attempt to fetch plan from users table (may not exist yet)
+      // Fetch plan from users table
       try {
         const planResult = await fromTable(supabase, 'users')
           .select('plan')
           .eq('id', userId)
           .maybeSingle()
         const planValue = (planResult.data as { plan?: string } | null)?.plan
-        if (planValue === 'pro' || planValue === 'team') {
+        if (planValue === 'pro' || planValue === 'sme' || planValue === 'team') {
           if (!cancelled) setPlan(planValue)
         }
       } catch {
@@ -135,6 +149,23 @@ export default function AccountPage() {
     timers.current[zoneName] = setTimeout(() => {
       setConfirms(prev => { const n = { ...prev }; delete n[zoneName]; return n })
     }, 3000)
+  }
+
+  async function handleUpgrade(upgradePlan: 'pro' | 'sme') {
+    setLoadingPlan(upgradePlan)
+    try {
+      const res = await fetch('/api/ls/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: upgradePlan }),
+      })
+      const { checkoutUrl } = await res.json()
+      if (checkoutUrl) window.location.href = checkoutUrl
+    } catch {
+      // silent fail — button re-enables
+    } finally {
+      setLoadingPlan(null)
+    }
   }
 
   async function toggle(zoneName: string, riskLevel: RiskLevel, riskScore: number) {
@@ -194,8 +225,69 @@ export default function AccountPage() {
   const activeCount  = Object.keys(subs).length
   const memberSince  = session.user.created_at ? formatMemberSince(session.user.created_at) : '—'
 
+  const upgradeBtnBase: React.CSSProperties = {
+    ...mono,
+    fontSize: '11px',
+    fontWeight: 600,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase',
+    padding: '12px 22px',
+    borderRadius: 0,
+    border: 'none',
+    background: 'var(--ink)',
+    color: '#fff',
+    cursor: 'pointer',
+    flexShrink: 0,
+  }
+
+  const paidBadgeStyle: React.CSSProperties = {
+    ...mono,
+    fontSize: '10px',
+    fontWeight: 600,
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    background: 'var(--ink)',
+    color: '#fff',
+    borderRadius: '2px',
+    padding: '3px 8px',
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--white)' }}>
+
+      {/* Upgrade success banner */}
+      {showBanner && (
+        <div style={{
+          background: 'var(--ink)',
+          color: '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 48px',
+          height: '40px',
+          flexShrink: 0,
+        }}>
+          <span style={{ ...mono, fontSize: '11px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+            PLAN ACTIVATED — WELCOME TO CARGORADAR PRO. YOUR FULL INTELLIGENCE ACCESS IS LIVE.
+          </span>
+          <button
+            onClick={() => setShowBanner(false)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#fff',
+              cursor: 'pointer',
+              ...mono,
+              fontSize: '16px',
+              lineHeight: 1,
+              padding: '0 0 0 16px',
+            }}
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Nav */}
       <nav style={{
@@ -241,39 +333,65 @@ export default function AccountPage() {
         {/* ── PLAN ── */}
         <div style={{ marginBottom: '48px' }}>
           <SectionLabel label="PLAN" />
+
+          {/* Current plan row */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--rule)' }}>
             <span style={{ ...mono, fontSize: '9px', letterSpacing: '0.14em', color: 'var(--muted)', textTransform: 'uppercase' }}>
               CURRENT PLAN
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              {/* Plan badge */}
-              <span style={{
-                ...mono,
-                fontSize: '10px',
-                fontWeight: 600,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                background: 'var(--off)',
-                border: '1px solid var(--rule)',
-                borderRadius: '2px',
-                padding: '3px 8px',
-                color: 'var(--ink)',
-              }}>
-                {plan.toUpperCase()}
-              </span>
               {plan === 'free' && (
-                <Link href="/account?upgrade=true" style={{
+                <span style={{
                   ...mono,
-                  fontSize: '11px',
-                  color: 'var(--muted)',
-                  textDecoration: 'none',
-                  letterSpacing: '0.04em',
+                  fontSize: '10px',
+                  fontWeight: 600,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                  background: 'var(--off)',
+                  border: '1px solid var(--rule)',
+                  borderRadius: '2px',
+                  padding: '3px 8px',
+                  color: 'var(--ink)',
                 }}>
-                  UPGRADE TO PRO →
-                </Link>
+                  FREE
+                </span>
+              )}
+              {plan === 'pro' && (
+                <span style={paidBadgeStyle}>PRO</span>
+              )}
+              {(plan === 'sme' || plan === 'team') && (
+                <span style={paidBadgeStyle}>BUSINESS</span>
               )}
             </div>
           </div>
+
+          {/* Upgrade buttons for free users */}
+          {plan === 'free' && (
+            <div style={{ display: 'flex', gap: '12px', marginTop: '20px', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => handleUpgrade('pro')}
+                disabled={loadingPlan !== null}
+                style={{
+                  ...upgradeBtnBase,
+                  opacity: loadingPlan !== null ? 0.6 : 1,
+                  cursor: loadingPlan !== null ? 'default' : 'pointer',
+                }}
+              >
+                {loadingPlan === 'pro' ? 'REDIRECTING...' : 'UPGRADE TO PRO — €49/MO'}
+              </button>
+              <button
+                onClick={() => handleUpgrade('sme')}
+                disabled={loadingPlan !== null}
+                style={{
+                  ...upgradeBtnBase,
+                  opacity: loadingPlan !== null ? 0.6 : 1,
+                  cursor: loadingPlan !== null ? 'default' : 'pointer',
+                }}
+              >
+                {loadingPlan === 'sme' ? 'REDIRECTING...' : 'UPGRADE TO BUSINESS — €149/MO'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* ── ALERT SUBSCRIPTIONS ── */}

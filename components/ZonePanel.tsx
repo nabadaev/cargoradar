@@ -489,18 +489,18 @@ export default function ZonePanel({ zone, onClose }: Props) {
                 ✓ Alerts active for {zone.name}
               </p>
             ) : userEmail ? (
-              /* Logged in, not yet subscribed — single button, use session email */
-              <>
+              /* Logged in, not yet subscribed */
+              plan === 'free' ? (
+                /* Free users: redirect to account to upgrade */
                 <button
-                  onClick={() => handleAlertSubscribe(userEmail)}
-                  disabled={alertStatus === 'loading'}
+                  onClick={() => { window.location.href = '/account' }}
                   style={{
                     display: 'block',
                     width: '100%',
                     background: 'var(--ink)',
                     color: '#fff',
                     border: 'none',
-                    cursor: alertStatus === 'loading' ? 'default' : 'pointer',
+                    cursor: 'pointer',
                     ...mono,
                     fontSize: '11px',
                     fontWeight: 600,
@@ -508,17 +508,42 @@ export default function ZonePanel({ zone, onClose }: Props) {
                     textTransform: 'uppercase',
                     padding: '11px',
                     borderRadius: 0,
-                    opacity: alertStatus === 'loading' ? 0.7 : 1,
                   }}
                 >
-                  {alertStatus === 'loading' ? 'SUBSCRIBING...' : 'SUBSCRIBE TO ALERTS'}
+                  UPGRADE TO GET ALERTS →
                 </button>
-                {alertStatus === 'error' && alertError && (
-                  <p style={{ ...mono, fontSize: '11px', color: '#c0392b', margin: '8px 0 0' }}>
-                    {alertError}
-                  </p>
-                )}
-              </>
+              ) : (
+                /* Paid users: subscribe directly */
+                <>
+                  <button
+                    onClick={() => handleAlertSubscribe(userEmail)}
+                    disabled={alertStatus === 'loading'}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      background: 'var(--ink)',
+                      color: '#fff',
+                      border: 'none',
+                      cursor: alertStatus === 'loading' ? 'default' : 'pointer',
+                      ...mono,
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      letterSpacing: '0.12em',
+                      textTransform: 'uppercase',
+                      padding: '11px',
+                      borderRadius: 0,
+                      opacity: alertStatus === 'loading' ? 0.7 : 1,
+                    }}
+                  >
+                    {alertStatus === 'loading' ? 'SUBSCRIBING...' : 'SUBSCRIBE TO ALERTS'}
+                  </button>
+                  {alertStatus === 'error' && alertError && (
+                    <p style={{ ...mono, fontSize: '11px', color: '#c0392b', margin: '8px 0 0' }}>
+                      {alertError}
+                    </p>
+                  )}
+                </>
+              )
             ) : (
               /* Not logged in — show email input */
               <>
