@@ -12,9 +12,8 @@ import type { Zone, RiskLevel } from '@/lib/mapdata'
 const mono: React.CSSProperties = { fontFamily: 'var(--mono)' }
 const body: React.CSSProperties = { fontFamily: 'var(--body)' }
 
-type AlertFreq = 'instant' | 'daily' | 'weekly'
-interface SubEntry { freq: AlertFreq }
-type SubMap = Record<string, SubEntry>
+// SubMap: zone name → subscribed (value is {} — presence = subscribed)
+type SubMap = Record<string, Record<string, never>>
 interface Confirm { msg: string; color: string }
 
 function SectionLabel({ label }: { label: string }) {
@@ -63,40 +62,30 @@ export default function SettingsPage() {
   }, [])
 
   // Fetch subscriptions once userId is known.
-  // Reads zone_alerts (requires SELECT policy — see migration 006).
-  // Silently ignores user_subscriptions if table is missing.
+  // zone_alerts is the single source of truth — no user_subscriptions query.
   useEffect(() => {
     if (!userId) return
     let cancelled = false
 
     async function load() {
       const supabase = getSupabaseClient()
-      const merged: SubMap = {}
 
       // Get user email from the auth client — most reliable source
       const { data: { user } } = await supabase.auth.getUser()
       const email = user?.email ?? ''
 
+      const map: SubMap = {}
       if (email) {
-        // zone_alerts — catches ZonePanel sign-ups (needs SELECT policy from migration 006)
-        const { data: alertRows } = await supabase
+        const { data } = await supabase
           .from('zone_alerts')
           .select('zone_name')
           .eq('email', email)
-        for (const row of alertRows ?? []) {
-          merged[row.zone_name] = { freq: 'instant' }
-        }
-
-        // user_subscriptions — silently skip if missing
-        const { data: subRows } = await supabase
-          .from('user_subscriptions')
-          .select('zone_name, alert_frequency')
-        for (const row of subRows ?? []) {
-          merged[row.zone_name] = { freq: row.alert_frequency as AlertFreq }
+        for (const row of data ?? []) {
+          map[row.zone_name] = {}
         }
       }
 
-      if (!cancelled) { setSubs(merged); setLoading(false) }
+      if (!cancelled) { setSubs(map); setLoading(false) }
     }
 
     load().catch(() => { if (!cancelled) setLoading(false) })
@@ -139,7 +128,7 @@ export default function SettingsPage() {
     // Optimistic update — immediate UI response
     setSubs(prev => {
       const next = { ...prev }
-      if (wasSubscribed) { delete next[zoneName] } else { next[zoneName] = { freq: 'instant' } }
+      if (wasSubscribed) { delete next[zoneName] } else { next[zoneName] = {} }
       return next
     })
     setToggling(t => ({ ...t, [zoneName]: true }))
@@ -182,7 +171,7 @@ export default function SettingsPage() {
       // Revert optimistic update
       setSubs(prev => {
         const next = { ...prev }
-        if (wasSubscribed) { next[zoneName] = { freq: 'instant' } } else { delete next[zoneName] }
+        if (wasSubscribed) { next[zoneName] = {} } else { delete next[zoneName] }
         return next
       })
       showConfirm(zoneName, 'Error — please try again', 'var(--red)')
