@@ -128,7 +128,8 @@ export async function GET(request: Request) {
 
         if (recentNewsItems && recentNewsItems.length > 0) {
           const now = Date.now()
-          const decayedScores = recentNewsItems
+          type NewsScoreRow = { cmrs_score: number | null; created_at: string }
+          const decayedScores = (recentNewsItems as NewsScoreRow[])
             .filter((n) => n.cmrs_score !== null && n.cmrs_score !== undefined)
             .map((n) => {
               const daysSince =

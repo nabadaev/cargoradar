@@ -87,9 +87,10 @@ export default function MapView({ onZoneClick }: Props) {
           .from('zones')
           .select('name, risk_score, risk_level')
 
+        type ZoneRow = { name: string; risk_score: number; risk_level: string }
         const liveScores: Record<string, { risk_score: number; risk_level: string }> = {}
         if (data) {
-          for (const row of data) {
+          for (const row of (data as ZoneRow[])) {
             liveScores[row.name] = { risk_score: row.risk_score, risk_level: row.risk_level }
           }
         }

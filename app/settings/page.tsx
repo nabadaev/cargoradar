@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getSupabaseClient } from '@/lib/supabase'
+import { getSupabaseClient, fromTable } from '@/lib/supabase'
 import { useSession } from '@/lib/auth'
 import RiskScore from '@/components/RiskScore'
 import { ZONES } from '@/lib/mapdata'
@@ -76,8 +76,7 @@ export default function SettingsPage() {
 
       const map: SubMap = {}
       if (email) {
-        const result = await supabase
-          .from('zone_alerts')
+        const result = await fromTable(supabase, 'zone_alerts')
           .select('zone_name')
           .eq('email', email)
         const rows = result.data as { zone_name: string }[] | null
@@ -137,8 +136,7 @@ export default function SettingsPage() {
     try {
       if (wasSubscribed) {
         // Unsubscribe — requires DELETE policy on zone_alerts (migration 006)
-        const { error } = await supabase
-          .from('zone_alerts')
+        const { error } = await fromTable(supabase, 'zone_alerts')
           .delete()
           .eq('zone_name', zoneName)
           .eq('email', email)
@@ -150,8 +148,7 @@ export default function SettingsPage() {
         showConfirm(zoneName, `✗ Unsubscribed from ${zoneName}`, 'var(--muted)')
       } else {
         // Subscribe — INSERT policy is WITH CHECK (true), works for all users
-        const { error } = await supabase
-          .from('zone_alerts')
+        const { error } = await fromTable(supabase, 'zone_alerts')
           .upsert({ email, zone_name: zoneName }, { onConflict: 'email,zone_name' })
         if (error) {
           console.error('[toggle] subscribe error:', error)

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import RiskScore from '@/components/RiskScore'
-import { getSupabaseClient } from '@/lib/supabase'
+import { getSupabaseClient, fromTable } from '@/lib/supabase'
 import type { Zone } from '@/lib/mapdata'
 
 interface NewsItem {
@@ -132,8 +132,7 @@ export default function ZonePanel({ zone, onClose }: Props) {
     const supabase = getSupabaseClient()
 
     async function load() {
-      const { data: zRow } = await supabase
-        .from('zones')
+      const { data: zRow } = await fromTable(supabase, 'zones')
         .select('id, risk_score, risk_level, description, updated_at')
         .eq('name', zone!.name)
         .single()
@@ -142,8 +141,7 @@ export default function ZonePanel({ zone, onClose }: Props) {
         setZoneData(zRow)
 
         // Fetch score history
-        const { data: history } = await supabase
-          .from('zone_score_history')
+        const { data: history } = await fromTable(supabase, 'zone_score_history')
           .select('risk_score, recorded_at')
           .eq('zone_id', zRow.id)
           .order('recorded_at', { ascending: true })
@@ -151,8 +149,7 @@ export default function ZonePanel({ zone, onClose }: Props) {
         setScoreHistory(history ?? [])
 
         // Fetch top 5 + count
-        const { data: news, count } = await supabase
-          .from('news_items')
+        const { data: news, count } = await fromTable(supabase, 'news_items')
           .select('headline, ai_summary, impact_zone, impact_region, impact_lane, cmrs_score, event_category, event_type, source_name, created_at', { count: 'exact' })
           .eq('zone_id', zRow.id)
           .order('created_at', { ascending: false })
