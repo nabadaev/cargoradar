@@ -5,7 +5,7 @@ const getResend = () => new Resend(process.env.RESEND_API_KEY)
 export async function sendWaitlistConfirmation({ to }: { to: string }) {
   const resend = getResend()
   await resend.emails.send({
-    from: 'CargoRadar <noreply@cargoradar.vercel.app>',
+    from: 'CargoRadar <onboarding@resend.dev>',
     to,
     subject: 'You\'re on the CargoRadar waitlist',
     text: `You're on the waitlist.\n\nWe'll be in touch when CargoRadar launches.\n\n— CargoRadar`,
@@ -35,7 +35,7 @@ export async function sendAlertEmail({
   const date = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()
 
   await resend.emails.send({
-    from: 'CargoRadar Alerts <noreply@cargoradar.vercel.app>',
+    from: 'CargoRadar Alerts <onboarding@resend.dev>',
     to,
     subject: `CargoRadar Alert: ${zoneName} risk escalated to ${riskLevel.toUpperCase()}`,
     text: `CARGORADAR INTELLIGENCE ALERT

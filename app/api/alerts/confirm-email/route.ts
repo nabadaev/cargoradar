@@ -19,7 +19,7 @@ export async function POST(request: Request) {
 
     const resend = getResend()
     await resend.emails.send({
-      from: 'CargoRadar <noreply@cargoradar.vercel.app>',
+      from: 'CargoRadar <onboarding@resend.dev>',
       to: email,
       subject: 'CargoRadar — Alert subscription confirmed',
       text: [
