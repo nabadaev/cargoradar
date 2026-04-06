@@ -39,7 +39,6 @@ export default function SettingsPage() {
 
   const [subs, setSubs]         = useState<SubMap>({})
   const [loading, setLoading]   = useState(true)
-  const [fetchError, setFetchError] = useState<string | null>(null)
   const [toggling, setToggling] = useState<Record<string, boolean>>({})
   const [confirms, setConfirms] = useState<Record<string, Confirm>>({})
 
@@ -51,32 +50,50 @@ export default function SettingsPage() {
     if (session === null) router.replace('/login')
   }, [session, router])
 
-  // Fetch subscriptions ONCE when userId is known
-  // userId is a string — stable reference, won't cause loops
+  // Fetch subscriptions ONCE when userId + userEmail are known.
+  // Reads from BOTH tables and merges — zone_alerts (ZonePanel sign-ups)
+  // and user_subscriptions (settings page sign-ups). If either table
+  // doesn't exist yet, treat it as empty rows — never hard-error.
   useEffect(() => {
-    if (!userId) return
+    if (!userId || !userEmail) return
     let cancelled = false
 
-    getSupabaseClient()
-      .from('user_subscriptions')
-      .select('zone_name, alert_frequency')
-      .then(({ data, error }) => {
-        if (cancelled) return
-        if (error) {
-          setFetchError('Failed to load subscriptions. Refresh to retry.')
-          setLoading(false)
-          return
-        }
-        const map: SubMap = {}
-        for (const row of data ?? []) {
-          map[row.zone_name] = { freq: row.alert_frequency as AlertFreq }
-        }
-        setSubs(map)
+    async function load() {
+      const supabase = getSupabaseClient()
+      const merged: SubMap = {}
+
+      // 1. zone_alerts — email-based, no auth required, always exists
+      const { data: alertRows } = await supabase
+        .from('zone_alerts')
+        .select('zone_name')
+        .eq('email', userEmail)
+      for (const row of alertRows ?? []) {
+        merged[row.zone_name] = { freq: 'instant' }
+      }
+
+      // 2. user_subscriptions — may not exist if migration hasn't run yet.
+      // Silently ignore any error (PGRST116 = table missing, 42P01 = relation
+      // does not exist). user_subscriptions freq overrides zone_alerts default.
+      const { data: subRows } = await supabase
+        .from('user_subscriptions')
+        .select('zone_name, alert_frequency')
+      for (const row of subRows ?? []) {
+        merged[row.zone_name] = { freq: row.alert_frequency as AlertFreq }
+      }
+
+      if (!cancelled) {
+        setSubs(merged)
         setLoading(false)
-      })
+      }
+    }
+
+    load().catch(() => {
+      // If both queries explode somehow, show zones with empty subs — never crash
+      if (!cancelled) setLoading(false)
+    })
 
     return () => { cancelled = true }
-  }, [userId]) // ← string dep, not object — no infinite loop
+  }, [userId, userEmail]) // stable strings — no infinite loop
 
   // Cleanup all fade timers on unmount
   useEffect(() => {
@@ -268,15 +285,8 @@ export default function SettingsPage() {
           </span>
         </div>
 
-        {/* Error state */}
-        {fetchError && (
-          <div style={{ ...mono, fontSize: '12px', color: 'var(--red)', padding: '16px 0' }}>
-            {fetchError}
-          </div>
-        )}
-
-        {/* Zone rows */}
-        {!fetchError && ZONES.map((zone) => {
+        {/* Zone rows — always render regardless of subscription fetch status */}
+        {ZONES.map((zone) => {
           const subscribed  = !!subs[zone.name]
           const isToggling  = toggling[zone.name] ?? false
           const confirm     = confirms[zone.name]
