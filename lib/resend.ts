@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { createServiceClient } from './supabase'
 
 const getResend = () => new Resend(process.env.RESEND_API_KEY)
 
@@ -16,6 +17,64 @@ export interface AlertNewsItem {
   ai_summary: string
   impact_lane: string
   cmrs_score: number | null
+}
+
+export async function sendWeeklyDigest() {
+  const supabase = createServiceClient()
+  const resend   = getResend()
+
+  // 1. Get all unique subscriber emails
+  const { data: alertRows, error: alertsErr } = await supabase
+    .from('zone_alerts')
+    .select('email')
+  if (alertsErr || !alertRows || alertRows.length === 0) return
+
+  const allEmails = (alertRows as { email: string }[]).map(r => r.email)
+  const emails = Array.from(new Set(allEmails))
+
+  // 2. Get top 5 zones by risk_score
+  const { data: topZones } = await supabase
+    .from('zones')
+    .select('name, risk_score, risk_level')
+    .order('risk_score', { ascending: false })
+    .limit(5)
+
+  if (!topZones || topZones.length === 0) return
+
+  // 3. Build plain-text body
+  const dateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()
+  type ZoneRow = { name: string; risk_score: number; risk_level: string }
+  const zoneLines = (topZones as ZoneRow[])
+    .map(z => `  ${z.name.padEnd(32)} ${z.risk_score.toFixed(1)}  ${z.risk_level.toUpperCase()}`)
+    .join('\n')
+
+  const text = `CARGORADAR WEEKLY BRIEF — ${dateStr}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TOP ZONES BY RISK SCORE
+
+${zoneLines}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+View full intelligence map:
+https://cargoradar.vercel.app/map
+
+CargoRadar | Ocean Freight Intelligence
+To unsubscribe, reply with "unsubscribe all"`
+
+  // 4. Send to each subscriber
+  for (const to of emails) {
+    try {
+      await resend.emails.send({
+        from: 'CargoRadar <onboarding@resend.dev>',
+        to,
+        subject: `CargoRadar Weekly — ${dateStr} Far East–Europe Brief`,
+        text,
+      })
+    } catch (err) {
+      console.error(`[weekly digest] failed to send to ${to}:`, err)
+    }
+  }
 }
 
 export async function sendAlertEmail({

@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import RiskScore from '@/components/RiskScore'
 import WaitlistForm from '@/components/WaitlistForm'
 import LiveRiskWidget from '@/components/LiveRiskWidget'
@@ -118,15 +119,31 @@ function Nav() {
           CARGORADAR
         </span>
       </div>
-      <span style={{
-        fontFamily: 'var(--mono)',
-        fontSize: '10px',
-        letterSpacing: '0.14em',
-        color: 'var(--muted)',
-        textTransform: 'uppercase',
-      }}>
-        EARLY ACCESS
-      </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+        <Link href="/login" style={{
+          fontFamily: 'var(--mono)',
+          fontSize: '11px',
+          letterSpacing: '0.1em',
+          color: 'var(--muted)',
+          textDecoration: 'none',
+          textTransform: 'uppercase',
+        }}>
+          SIGN IN
+        </Link>
+        <Link href="/map" style={{
+          fontFamily: 'var(--mono)',
+          fontSize: '11px',
+          fontWeight: 600,
+          letterSpacing: '0.1em',
+          color: '#fff',
+          background: 'var(--ink)',
+          padding: '10px 18px',
+          textDecoration: 'none',
+          textTransform: 'uppercase',
+        }}>
+          VIEW MAP
+        </Link>
+      </div>
     </nav>
   )
 }

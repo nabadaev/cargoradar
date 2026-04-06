@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import RiskScore from '@/components/RiskScore'
 import { getSupabaseClient, fromTable } from '@/lib/supabase'
+import { useSession } from '@/lib/auth'
+import { getUserPlan } from '@/lib/plan'
 import type { Zone } from '@/lib/mapdata'
 
 interface NewsItem {
@@ -81,8 +83,25 @@ function ImpactBlock({ label, text }: { label: string; text: string | null }) {
 }
 
 function Sparkline({ data, color }: { data: number[]; color: string }) {
-  if (data.length < 2) return null
+  if (data.length === 0) return null
   const w = 332, h = 32, pad = 2
+
+  // Single point — render a flat horizontal line at that value's midpoint
+  if (data.length === 1) {
+    const y = h / 2
+    return (
+      <div style={{ marginTop: '12px' }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '9px', letterSpacing: '0.14em', color: 'var(--muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
+          30-DAY TREND
+        </div>
+        <svg width={w} height={h} style={{ display: 'block', width: '100%' }} viewBox={`0 0 ${w} ${h}`}>
+          <line x1={pad} y1={y} x2={w - pad} y2={y} stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeDasharray="4 4" />
+          <circle cx={w / 2} cy={y} r={2.5} fill={color} />
+        </svg>
+      </div>
+    )
+  }
+
   const min = Math.min(...data), max = Math.max(...data)
   const range = max - min || 1
   const pts = data.map((v, i) => {
@@ -103,6 +122,9 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
 }
 
 export default function ZonePanel({ zone, onClose }: Props) {
+  const session = useSession()
+  const userEmail = session?.user?.email ?? null
+
   const [zoneData, setZoneData]           = useState<ZoneData | null>(null)
   const [newsItems, setNewsItems]         = useState<NewsItem[]>([])
   const [totalCount, setTotalCount]       = useState(0)
@@ -111,11 +133,32 @@ export default function ZonePanel({ zone, onClose }: Props) {
   const [situation, setSituation]         = useState<string | null>(null)
   const [situationLoading, setSituationLoading] = useState(false)
   const [scoreHistory, setScoreHistory]   = useState<{ risk_score: number; recorded_at: string }[]>([])
+  const [plan, setPlan]                   = useState<'free' | 'pro' | 'team'>('free')
 
   // Alert signup state
   const [alertEmail, setAlertEmail]       = useState('')
   const [alertStatus, setAlertStatus]     = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [alertError, setAlertError]       = useState('')
+  const [isSubscribed, setIsSubscribed]   = useState(false)
+
+  // Fetch user plan once on mount
+  useEffect(() => {
+    getUserPlan().then(setPlan).catch(() => {})
+  }, [])
+
+  // Check if logged-in user is already subscribed to this zone
+  useEffect(() => {
+    if (!zone || !userEmail) { setIsSubscribed(false); return }
+    const supabase = getSupabaseClient()
+    fromTable(supabase, 'zone_alerts')
+      .select('id')
+      .eq('email', userEmail)
+      .eq('zone_name', zone.name)
+      .maybeSingle()
+      .then(({ data }: { data: { id: string } | null }) => {
+        setIsSubscribed(!!data)
+      })
+  }, [zone, userEmail])
 
   useEffect(() => {
     if (!zone) return
@@ -201,15 +244,17 @@ export default function ZonePanel({ zone, onClose }: Props) {
     setOpenIndex(prev => (prev === i ? null : i))
   }
 
-  async function handleAlertSubscribe() {
+  async function handleAlertSubscribe(emailOverride?: string) {
     if (!zone) return
+    const email = emailOverride ?? alertEmail
+    if (!email) return
     setAlertStatus('loading')
     setAlertError('')
     try {
       const res = await fetch('/api/alerts/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: alertEmail, zone_name: zone.name }),
+        body: JSON.stringify({ email, zone_name: zone.name }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -217,6 +262,7 @@ export default function ZonePanel({ zone, onClose }: Props) {
         setAlertStatus('error')
       } else {
         setAlertStatus('success')
+        setIsSubscribed(true)
       }
     } catch {
       setAlertError('Network error — please try again')
@@ -263,7 +309,7 @@ export default function ZonePanel({ zone, onClose }: Props) {
                 Updated {updatedAt}
               </span>
             </div>
-            {scoreHistory.length >= 2 && (
+            {scoreHistory.length >= 1 && (
               <Sparkline
                 data={scoreHistory.map(h => h.risk_score)}
                 color={sparklineColor}
@@ -286,9 +332,22 @@ export default function ZonePanel({ zone, onClose }: Props) {
                 Generating situation summary...
               </p>
             ) : situation ? (
-              <p style={{ ...body, fontSize: '13px', color: 'var(--ink)', lineHeight: 1.65, margin: 0 }}>
-                {situation}
-              </p>
+              plan === 'free' ? (
+                <div>
+                  <p style={{ ...body, fontSize: '13px', color: 'var(--ink)', lineHeight: 1.65, margin: 0 }}>
+                    {situation.split('.')[0] + '.'}
+                  </p>
+                  <p style={{ ...mono, fontSize: '10px', color: 'var(--muted)', marginTop: '8px', letterSpacing: '0.04em' }}>
+                    <a href="/account" style={{ color: 'var(--muted)', textDecoration: 'underline' }}>
+                      Upgrade to Pro for full intelligence brief →
+                    </a>
+                  </p>
+                </div>
+              ) : (
+                <p style={{ ...body, fontSize: '13px', color: 'var(--ink)', lineHeight: 1.65, margin: 0 }}>
+                  {situation}
+                </p>
+              )
             ) : (
               <p style={{ ...body, fontSize: '13px', color: 'var(--ink)', lineHeight: 1.65, margin: 0 }}>
                 {description}
@@ -424,11 +483,44 @@ export default function ZonePanel({ zone, onClose }: Props) {
               <div style={{ flex: 1, height: '1px', background: 'var(--rule)' }} />
             </div>
 
-            {alertStatus === 'success' ? (
+            {/* Already subscribed (optimistic or confirmed) */}
+            {(alertStatus === 'success' || isSubscribed) ? (
               <p style={{ ...mono, fontSize: '11px', color: '#1a6b3a', margin: 0 }}>
                 ✓ Alerts active for {zone.name}
               </p>
+            ) : userEmail ? (
+              /* Logged in, not yet subscribed — single button, use session email */
+              <>
+                <button
+                  onClick={() => handleAlertSubscribe(userEmail)}
+                  disabled={alertStatus === 'loading'}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    background: 'var(--ink)',
+                    color: '#fff',
+                    border: 'none',
+                    cursor: alertStatus === 'loading' ? 'default' : 'pointer',
+                    ...mono,
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase',
+                    padding: '11px',
+                    borderRadius: 0,
+                    opacity: alertStatus === 'loading' ? 0.7 : 1,
+                  }}
+                >
+                  {alertStatus === 'loading' ? 'SUBSCRIBING...' : 'SUBSCRIBE TO ALERTS'}
+                </button>
+                {alertStatus === 'error' && alertError && (
+                  <p style={{ ...mono, fontSize: '11px', color: '#c0392b', margin: '8px 0 0' }}>
+                    {alertError}
+                  </p>
+                )}
+              </>
             ) : (
+              /* Not logged in — show email input */
               <>
                 <input
                   type="email"
@@ -451,7 +543,7 @@ export default function ZonePanel({ zone, onClose }: Props) {
                   onKeyDown={e => { if (e.key === 'Enter') handleAlertSubscribe() }}
                 />
                 <button
-                  onClick={handleAlertSubscribe}
+                  onClick={() => handleAlertSubscribe()}
                   disabled={alertStatus === 'loading'}
                   style={{
                     display: 'block',

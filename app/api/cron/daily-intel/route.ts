@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/supabase'
 import { fetchMaritimeNews } from '@/lib/rss'
 import { analyseNewsItem } from '@/lib/claude'
 import { computeCMRS } from '@/lib/scoring'
-import { sendAlertEmail } from '@/lib/resend'
+import { sendAlertEmail, sendWeeklyDigest } from '@/lib/resend'
 import type { AlertNewsItem } from '@/lib/resend'
 import type { RiskLevel } from '@/lib/mapdata'
 
@@ -216,6 +216,16 @@ export async function GET(request: Request) {
         errors.push(
           `Zone ${zone.name} — ${zoneErr instanceof Error ? zoneErr.message : String(zoneErr)}`,
         )
+      }
+    }
+
+    // Send weekly digest every Monday
+    const isMonday = new Date().getDay() === 1
+    if (isMonday) {
+      try {
+        await sendWeeklyDigest()
+      } catch (digestErr) {
+        errors.push(`Weekly digest — ${digestErr instanceof Error ? digestErr.message : String(digestErr)}`)
       }
     }
 

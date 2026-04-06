@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { getSupabaseClient, fromTable } from '@/lib/supabase'
 import { useSession } from '@/lib/auth'
 import RiskScore from '@/components/RiskScore'
+import AvatarMenu from '@/components/AvatarMenu'
 import { ZONES } from '@/lib/mapdata'
 import type { Zone, RiskLevel } from '@/lib/mapdata'
 
@@ -178,11 +179,6 @@ export default function SettingsPage() {
     }
   }
 
-  async function handleSignOut() {
-    await getSupabaseClient().auth.signOut()
-    router.replace('/')
-  }
-
   // ── Loading / guard ─────────────────────────────────────────────────────────
 
   if (session === undefined || (session !== null && loading)) {
@@ -219,16 +215,7 @@ export default function SettingsPage() {
           <Link href="/map" style={{ ...mono, fontSize: '11px', letterSpacing: '0.1em', color: 'var(--muted)', textDecoration: 'none', textTransform: 'uppercase' }}>
             MAP
           </Link>
-          <span style={{ ...mono, fontSize: '11px', letterSpacing: '0.04em', color: 'var(--muted)' }}>
-            {session.user.email}
-          </span>
-          <button onClick={handleSignOut} style={{
-            ...mono, fontSize: '11px', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
-            background: 'transparent', border: '1px solid var(--rule)', color: 'var(--ink)',
-            padding: '6px 14px', cursor: 'pointer', borderRadius: 0,
-          }}>
-            SIGN OUT
-          </button>
+          <AvatarMenu email={session.user.email ?? ''} />
         </div>
       </nav>
 
@@ -316,13 +303,13 @@ export default function SettingsPage() {
                 {session.user.email}
               </div>
             </div>
-            <button onClick={handleSignOut} style={{
+            <Link href="/account" style={{
               ...mono, fontSize: '11px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase',
               background: 'transparent', border: '1px solid var(--rule)', color: 'var(--ink)',
-              padding: '8px 18px', cursor: 'pointer', borderRadius: 0,
+              padding: '8px 18px', textDecoration: 'none',
             }}>
-              SIGN OUT
-            </button>
+              ACCOUNT →
+            </Link>
           </div>
         </div>
 

@@ -1,9 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { ZONES } from '@/lib/mapdata'
+import { useSession } from '@/lib/auth'
 import type { NewsAnalysis } from '@/lib/claude'
 import type { CMRSResult } from '@/lib/scoring'
+
+const ADMIN_EMAILS = ['nabadaev@gmail.com']
 
 const CREDIBILITY_OPTIONS = [
   { label: "Lloyd's List",    value: 1.00 },
@@ -51,6 +55,20 @@ function riskColor(level: string) {
 }
 
 export default function AdminPage() {
+  const session = useSession()
+  const router  = useRouter()
+
+  // Client-side auth + admin guard
+  useEffect(() => {
+    if (session === null) {
+      router.replace('/login?next=/admin')
+      return
+    }
+    if (session && !ADMIN_EMAILS.includes(session.user.email ?? '')) {
+      router.replace('/map')
+    }
+  }, [session, router])
+
   const [rawContent, setRawContent]     = useState('')
   const [zoneId, setZoneId]             = useState(ZONES[0].id)
   const [credibility, setCredibility]   = useState(1.00)
@@ -104,6 +122,10 @@ export default function AdminPage() {
       setSaving(false)
     }
   }
+
+  // Show nothing while session is loading or if not admin
+  if (session === undefined || session === null) return null
+  if (!ADMIN_EMAILS.includes(session.user.email ?? '')) return null
 
   return (
     <div style={{ minHeight: '100vh', background: '#fff', padding: '40px 48px', maxWidth: '960px', margin: '0 auto' }}>
