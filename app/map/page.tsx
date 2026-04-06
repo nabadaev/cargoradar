@@ -113,9 +113,10 @@ function MapNav({ search, onSearch }: { search: string; onSearch: (v: string) =>
           letterSpacing: '0.12em',
           color: '#fff',
           background: 'var(--ink)',
-          padding: '7px 16px',
+          padding: '12px 22px',
           textDecoration: 'none',
           textTransform: 'uppercase',
+          borderRadius: 0,
         }}>
           SIGN IN
         </Link>

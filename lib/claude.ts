@@ -101,11 +101,11 @@ export async function generateZoneSituation(
     model: 'claude-sonnet-4-6',
     max_tokens: 256,
     system:
-      'You are a maritime freight analyst. Write exactly 3 sentences summarizing the current situation for the specified zone based on recent intelligence items. Be specific, factual, and focused on operational implications for freight operators. No preamble, no markdown. Your response must be exactly 3 sentences.',
+      'You are a maritime freight analyst. Write EXACTLY 3 sentences. No more than 3 sentences. Each sentence must be 20 words or fewer. Each sentence must end with a full stop. Do not combine sentences with semicolons. Do not write a 4th sentence. Stop writing after the third full stop. No preamble, no markdown, no labels.',
     messages: [
       {
         role: 'user',
-        content: `Zone: ${zoneName}\n\nRecent intelligence:\n${itemsText}\n\nWrite exactly 3 sentences summarizing the current situation for ${zoneName}.`,
+        content: `Zone: ${zoneName}\n\nRecent intelligence:\n${itemsText}\n\nSummarize the current situation for ${zoneName} in EXACTLY 3 short sentences (max 20 words each). Stop after sentence 3.`,
       },
     ],
   })
